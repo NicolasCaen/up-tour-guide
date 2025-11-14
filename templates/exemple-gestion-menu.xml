@@ -8,7 +8,7 @@
       <wait_for>a[href*=&quot;site-editor.php&quot;]</wait_for>
       <wait_timeout>0</wait_timeout>
       <delay_ms>200</delay_ms>
-      <resume>none</resume>
+      <resume>auto</resume>
     </step>
     <step selector="a[href*=&#039;site-editor.php&#039;]" position="right">
       <title>Éditeur du site</title>
@@ -25,7 +25,7 @@
       <wait_for>.navigation-navigation-item</wait_for>
       <wait_timeout>0</wait_timeout>
       <delay_ms>0</delay_ms>
-      <resume>none</resume>
+      <resume>auto</resume>
     </step>
   </steps>
 </template>

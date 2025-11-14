@@ -300,19 +300,19 @@ function tour_guide_render_templates_page() {
                         <tr>
                             <td class="tg-sec-number"><?php echo ( $i + 1 ); ?></td>
                             <td class="tg-sec-selector">
-                                <span class="tg-cell-label"><span class="tg-info" title="Sélecteur CSS de l’élément ciblé (ex: #menu-appearance, .my-class)">i</span></span>
+                                <span class="tg-cell-label"><span class="tg-info" data-tip="Sélecteur CSS de l’élément ciblé (ex: #menu-appearance, .my-class)">i</span></span>
                                 <input type="text" name="step_selector[]" value="<?php echo esc_attr( $step['selector'] ); ?>" class="regular-text" />
                             </td>
                             <td class="tg-sec-title">
-                                <span class="tg-cell-label"><span class="tg-info" title="Titre affiché dans la popover Driver.js">i</span></span>
+                                <span class="tg-cell-label"><span class="tg-info" data-tip="Titre affiché dans la popover Driver.js">i</span></span>
                                 <input type="text" name="step_title[]" value="<?php echo esc_attr( $step['title'] ); ?>" class="regular-text" />
                             </td>
                             <td class="tg-sec-desc">
-                                <span class="tg-cell-label"><span class="tg-info" title="Description affichée dans la popover">i</span></span>
+                                <span class="tg-cell-label"><span class="tg-info" data-tip="Description affichée dans la popover">i</span></span>
                                 <textarea name="step_description[]" rows="2" class="large-text"><?php echo esc_textarea( $step['description'] ); ?></textarea>
                             </td>
                             <td class="tg-sec-position">
-                                <span class="tg-cell-label"><span class="tg-info" title="Position de la popover par rapport à l’élément (top/right/bottom/left/center)">i</span></span>
+                                <span class="tg-cell-label"><span class="tg-info" data-tip="Position de la popover par rapport à l’élément (top/right/bottom/left/center)">i</span></span>
                                 <select name="step_position[]">
                                     <?php
                                     $positions = array( 'top', 'right', 'bottom', 'left', 'center' );
@@ -323,7 +323,7 @@ function tour_guide_render_templates_page() {
                                 </select>
                             </td>
                             <td class="tg-sec-action">
-                                <span class="tg-cell-label"><span class="tg-info" title="Définir une action automatique (ex: clic) et/ou une navigation, avant d’afficher la popover">i</span></span>
+                                <span class="tg-cell-label"><span class="tg-info" data-tip="Définir une action automatique (ex: clic) et/ou une navigation, avant d’afficher la popover">i</span></span>
                                 <div class="tg-subfield">
                                     <label>Action automatique</label>
                                     <select name="step_action[]">
@@ -343,7 +343,7 @@ function tour_guide_render_templates_page() {
                                 </div>
                             </td>
                             <td class="tg-sec-wait">
-                                <span class="tg-cell-label"><span class="tg-info" title="Attendre l’apparition d’un sélecteur, avec timeout (ms) et un délai optionnel avant d’avancer">i</span></span>
+                                <span class="tg-cell-label"><span class="tg-info" data-tip="Attendre l’apparition d’un sélecteur, avec timeout (ms) et un délai optionnel avant d’avancer">i</span></span>
                                 <div class="tg-subfield">
                                     <label>Attendre le sélecteur</label>
                                     <input type="text" name="step_wait_for[]" value="<?php echo esc_attr( isset($step['wait_for'])?$step['wait_for']:'' ); ?>" placeholder="ex: .navigation-navigation-item" class="regular-text" />
@@ -358,7 +358,7 @@ function tour_guide_render_templates_page() {
                                 </div>
                             </td>
                             <td class="tg-sec-resume">
-                                <span class="tg-cell-label"><span class="tg-info" title="Reprise automatique après navigation (ex: passer à l’étape suivante)">i</span></span>
+                                <span class="tg-cell-label"><span class="tg-info" data-tip="Reprise automatique après navigation (ex: passer à l’étape suivante)">i</span></span>
                                 <select name="step_resume[]">
                                     <?php $resumes = array( 'none' => __( 'Aucune', 'tour-guide' ), 'auto' => __( 'Auto', 'tour-guide' ) );
                                     foreach ( $resumes as $val => $lab ) {

@@ -158,6 +158,26 @@
       doneBtnText: 'Terminer'
     });
     if (!driver) { console.warn('[Tour Guide Admin] Driver introuvable'); return; }
+    // Wrapper pour autoriser HTML dans description
+    function toHtmlNode(str){
+      if (typeof str !== 'string') return str;
+      var div = document.createElement('div');
+      div.innerHTML = str;
+      return div;
+    }
+    if (typeof driver.setSteps === 'function'){
+      var _setSteps = driver.setSteps.bind(driver);
+      driver.setSteps = function(stepsArg){
+        var mapped = (stepsArg||[]).map(function(s){
+          var step = Object.assign({}, s);
+          var pop = step.popover || { title: step.title, description: step.description, position: step.position };
+          if (typeof pop.description === 'string') { pop = Object.assign({}, pop, { description: toHtmlNode(pop.description) }); }
+          step.popover = pop;
+          return step;
+        });
+        return _setSteps(mapped);
+      };
+    }
     (async function(){
       try{
         var resume=getResume();
@@ -338,8 +358,9 @@
           var desc = (tr.querySelector('textarea[name="step_description[]"]')||{}).value || '';
           var pos = (tr.querySelector('select[name="step_position[]"]')||{}).value || 'bottom';
           var driver = createDriverInstance({ allowClose:true, animate:true, opacity:0.2, showButtons:['close'], closeBtnText:'Fermer' });
+          function toHtmlNode(str){ var d=document.createElement('div'); d.innerHTML=str||''; return d; }
           if (driver && typeof driver.highlight==='function'){
-            driver.highlight({ element: selector, popover: { title: title, description: desc, position: pos } });
+            driver.highlight({ element: selector, popover: { title: title, description: toHtmlNode(desc), position: pos } });
           }
         }
         return;

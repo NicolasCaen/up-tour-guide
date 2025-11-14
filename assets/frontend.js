@@ -20,6 +20,25 @@
     });
     if (!driver) { return; }
     try {
+      function toHtmlNode(str){
+        if (typeof str !== 'string') return str;
+        var div = document.createElement('div');
+        div.innerHTML = str;
+        return div;
+      }
+      if (typeof driver.setSteps === 'function'){
+        var _setSteps = driver.setSteps.bind(driver);
+        driver.setSteps = function(stepsArg){
+          var mapped = (stepsArg||[]).map(function(s){
+            var step = Object.assign({}, s);
+            var pop = step.popover || { title: step.title, description: step.description, position: step.position };
+            if (typeof pop.description === 'string') { pop = Object.assign({}, pop, { description: toHtmlNode(pop.description) }); }
+            step.popover = pop;
+            return step;
+          });
+          return _setSteps(mapped);
+        };
+      }
       if (typeof driver.setConfig === 'function') {
         try { driver.setConfig({
           showButtons: ['previous','next','close'],

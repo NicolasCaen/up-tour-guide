@@ -91,6 +91,26 @@
     });
     console.log('[Tour Guide Editor] startEditorTour called, driver instance:', driver);
     if (!driver) { console.warn('[Tour Guide Editor] Aucun driver disponible'); return; }
+    // HTML dans description (nouvelle API)
+    function toHtmlNode(str){
+      if (typeof str !== 'string') return str;
+      var div = document.createElement('div');
+      div.innerHTML = str;
+      return div;
+    }
+    if (typeof driver.setSteps === 'function'){
+      var _setSteps = driver.setSteps.bind(driver);
+      driver.setSteps = function(stepsArg){
+        var mapped = (stepsArg||[]).map(function(s){
+          var step = Object.assign({}, s);
+          var pop = step.popover || { title: step.title, description: step.description, position: step.position };
+          if (typeof pop.description === 'string') { pop = Object.assign({}, pop, { description: toHtmlNode(pop.description) }); }
+          step.popover = pop;
+          return step;
+        });
+        return _setSteps(mapped);
+      };
+    }
     (async function(){
       try {
         var resume = getResume();
