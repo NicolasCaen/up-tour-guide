@@ -7,9 +7,107 @@
     return null;
   }
 
+  // Fermer tous les sous-menus WordPress ouverts par le tour
+  function closeAllTourMenus(){
+    try{
+      var openMenus = document.querySelectorAll('#adminmenu li.wp-has-submenu.tg-opened');
+      openMenus.forEach(function(menu){
+        menu.classList.remove('wp-menu-open', 'opensub', 'tg-opened');
+        var submenu = menu.querySelector('.wp-submenu');
+        if (submenu) submenu.style.display = '';
+      });
+    }catch(e){ console.warn('[TG] Erreur fermeture menus', e); }
+  }
+
+  // Ouvrir le sous-menu pour une étape spécifique
+  // Utilise de préférence l'élément DOM fourni par Driver.js (argument element des hooks)
+  function openMenuForStep(step, element){
+    var target = null;
+    try{
+      // 1) Si Driver.js nous fournit déjà l'élément ciblé
+      if (element && element.nodeType === 1) {
+        target = element;
+      } else if (step) {
+        // 2) Sinon, on retombe sur les sélecteurs de l’étape (selector puis element string)
+        var selector = null;
+        if (typeof step.selector === 'string' && step.selector) {
+          selector = step.selector;
+        } else if (typeof step.element === 'string' && step.element) {
+          selector = step.element;
+        }
+        if (!selector || selector === 'body') return;
+
+        // Préférer la barre latérale admin (#adminmenu) pour éviter de toucher à d'autres liens
+        var scoped = null;
+        try {
+          scoped = document.querySelector('#adminmenu ' + selector);
+        } catch(_e) {
+          scoped = null;
+        }
+        if (scoped) {
+          target = scoped;
+        } else {
+          target = document.querySelector(selector);
+        }
+
+        if (!target) {
+          console.warn('[TG] Élément non trouvé pour le sélecteur:', selector);
+          return;
+        }
+      } else {
+        return;
+      }
+
+      // Ne gérer que les éléments situés dans le menu latéral admin
+      if (!target.closest('#adminmenu')) {
+        return;
+      }
+
+      // Chercher le parent menu WordPress qui contient cet élément
+      var parentLi = target.closest('#adminmenu li.wp-has-submenu');
+      
+      if (parentLi){
+        console.log('[TG] Menu parent trouvé:', parentLi.id || parentLi.className);
+        
+        // Marquer ce menu comme ouvert par le tour
+        parentLi.classList.add('wp-menu-open', 'opensub', 'tg-opened');
+        
+        // Forcer l'affichage du sous-menu
+        var submenu = parentLi.querySelector('.wp-submenu');
+        if (submenu){
+          submenu.style.display = 'block';
+          console.log('[TG] Sous-menu affiché pour:', selector);
+        }
+      }
+    }catch(e){
+      console.warn('[TG] Erreur ouverture menu pour', selector, e);
+    }
+  }
+
   function startTour(steps, tourId){
     console.log('[Tour Guide Admin] startTour called, tourId:', tourId, 'steps:', Array.isArray(steps)?steps.length:'?');
-    var driver = createDriverInstance({
+
+    var hooks = {
+      onHighlightStarted: function(element, step, options){
+        // À chaque étape, fermer les anciens menus et ouvrir celui qui correspond à l’élément ciblé
+        try {
+          closeAllTourMenus();
+          openMenuForStep(step || null, element || null);
+        } catch(e){
+          console.warn('[TG] Erreur onHighlightStarted:', e);
+        }
+      },
+      onDestroyStarted: function(){
+        // Quand le tour se termine, fermer tous les menus ouverts
+        try {
+          closeAllTourMenus();
+        } catch(e){
+          console.warn('[TG] Erreur onDestroyStarted:', e);
+        }
+      }
+    };
+
+    var driver = createDriverInstance(Object.assign({
       allowClose: true,
       animate: true,
       opacity: 0.2,
@@ -18,12 +116,18 @@
       prevBtnText: 'Précédent',
       closeBtnText: 'Fermer',
       doneBtnText: 'Terminer'
-    });
+    }, hooks));
     if (!driver) { console.warn('[Tour Guide Admin] Driver introuvable'); return; }
-    
+
     try{
       if (typeof driver.setConfig==='function'){
-        driver.setConfig({ showButtons:['previous','next','close'], nextBtnText:'Suivant', prevBtnText:'Précédent', closeBtnText:'Fermer', doneBtnText:'Terminer' });
+        driver.setConfig(Object.assign({ 
+          showButtons:['previous','next','close'], 
+          nextBtnText:'Suivant', 
+          prevBtnText:'Précédent', 
+          closeBtnText:'Fermer', 
+          doneBtnText:'Terminer'
+        }, hooks));
       }
       if (typeof driver.defineSteps==='function' && typeof driver.start==='function'){
         driver.defineSteps(steps||[]);
@@ -38,6 +142,60 @@
       }
     }catch(e){ console.error('[Tour Guide Admin] Error', e); }
   }
+
+  // Fallback global : si Driver.js ne ferme pas correctement la popover
+  // on force la fermeture de l'UI (popover + overlay) après le clic sur Fermer/Terminer
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if (!t) return;
+
+    var isClose = false;
+    if (t.classList && (t.classList.contains('driver-popover-close-btn') || t.classList.contains('driver-close-btn'))){
+      isClose = true;
+    }
+    if (!isClose && t.tagName === 'BUTTON'){
+      var txt = (t.textContent || '').trim();
+      if (txt === 'Fermer' || txt === 'Terminer'){
+        isClose = true;
+      }
+    }
+    if (!isClose) return;
+
+    console.log('[TG] Fallback fermeture détecté sur bouton Driver.js');
+
+    // Laisser Driver.js réagir d'abord, puis vérifier si l'UI est toujours présente
+    setTimeout(function(){
+      try {
+        var pop = document.querySelector('.driver-popover');
+        var overlay = document.querySelector('.driver-overlay');
+
+        // Si Driver.js a déjà tout retiré, ne rien faire
+        if (!pop && !overlay) return;
+
+        console.log('[TG] Fallback fermeture appliqué (cleanup complet)');
+
+        // Nettoyer les classes globales qui bloquent les clics
+        var body = document.body;
+        var html = document.documentElement;
+        if (body && body.classList) {
+          body.classList.remove('driver-active', 'driver-fade');
+        }
+        if (html && html.classList) {
+          html.classList.remove('driver-active', 'driver-fade');
+        }
+        var actives = document.querySelectorAll('.driver-active-element');
+        actives.forEach(function(el){ el.classList.remove('driver-active-element'); });
+
+        // Retirer complètement l'overlay et la popover restantes
+        if (overlay && overlay.parentNode){
+          overlay.parentNode.removeChild(overlay);
+        }
+        if (pop && pop.parentNode){
+          pop.parentNode.removeChild(pop);
+        }
+      } catch(_) {}
+    }, 200);
+  }, true);
 
   document.addEventListener('DOMContentLoaded', function(){
     var data = window.TOUR_GUIDE_DATA || {};
@@ -125,9 +283,6 @@
       }
 
       var open = false;
-      var overBtn = false;
-      var overDd = false;
-      var closeT = null;
       var dd = ensureDropdown();
       function show(){
         renderItems(dd);
@@ -139,19 +294,14 @@
         dd.style.display = 'none';
         open = false;
       }
-      function scheduleClose(){
-        if (closeT) { clearTimeout(closeT); closeT = null; }
-        closeT = setTimeout(function(){
-          if (!overBtn && !overDd && open) hide();
-        }, 200);
+      function toggle(ev){
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (open) { hide(); } else { show(); }
       }
-      function toggle(ev){ ev.preventDefault(); ev.stopPropagation(); open ? hide() : show(); }
 
+      // Ouverture/fermeture uniquement au clic, plus de logique de survol qui ferme trop vite
       mainBtn.addEventListener('click', toggle, false);
-      mainBtn.addEventListener('mouseenter', function(){ overBtn = true; if (open) { if (closeT){ clearTimeout(closeT); closeT=null; } } }, false);
-      mainBtn.addEventListener('mouseleave', function(){ overBtn = false; if (open) scheduleClose(); }, false);
-      dd.addEventListener('mouseenter', function(){ overDd = true; if (closeT){ clearTimeout(closeT); closeT=null; } }, false);
-      dd.addEventListener('mouseleave', function(){ overDd = false; scheduleClose(); }, false);
       document.addEventListener('click', function(e){
         if (!open) return;
         var insideBtn = e.target && (e.target === mainBtn || mainBtn.contains(e.target));
@@ -297,7 +447,22 @@
           var title = (tr.querySelector('input[name="step_title[]"]')||{}).value || 'Test';
           var desc = (tr.querySelector('textarea[name="step_description[]"]')||{}).value || '';
           var pos = (tr.querySelector('select[name="step_position[]"]')||{}).value || 'bottom';
-          var driver = createDriverInstance({ allowClose:true, animate:true, opacity:0.2, showButtons:['close'], closeBtnText:'Fermer' });
+          
+          // Fermer les menus précédents et ouvrir celui de cette étape
+          closeAllTourMenus();
+          openMenuForStep({ element: selector });
+          
+          var driver = createDriverInstance({ 
+            allowClose:true, 
+            animate:true, 
+            opacity:0.2, 
+            showButtons:['close'], 
+            closeBtnText:'Fermer',
+            onDestroyStarted: function() {
+              // Fermer le menu quand on ferme le test
+              closeAllTourMenus();
+            }
+          });
           if (driver && typeof driver.highlight==='function'){
             driver.highlight({ element: selector, popover: { title: title, description: desc, position: pos } });
           }

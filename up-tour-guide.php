@@ -2,7 +2,7 @@
 /**
  * Plugin Name: up-Tour guidé
  * Description: Visites guidées pour WordPress (Gutenberg et interface d’admin) avec Driver.js, gestion de templates XML activables.
- * Version: 0.1.5.0
+ * Version: 0.1.6.0
  * Author: GEHIN Nicolas
  * Text Domain: tour-guide
  * Domain Path: /languages
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'TOUR_GUIDE_VERSION', '0.1.5.0' );
+define( 'TOUR_GUIDE_VERSION', '0.1.6.0' );
 define( 'TOUR_GUIDE_FILE', __FILE__ );
 define( 'TOUR_GUIDE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TOUR_GUIDE_URL', plugin_dir_url( __FILE__ ) );
@@ -73,9 +73,9 @@ function tour_guide_enqueue_admin_assets( $hook ) {
     wp_enqueue_script( 'jquery-ui-sortable' );
     wp_enqueue_style( 'driverjs-style' );
 
-    wp_enqueue_style( 'tour-guide-admin', TOUR_GUIDE_URL . 'assets/admin.css', array(), TOUR_GUIDE_VERSION );
+    wp_enqueue_style( 'tour-guide-admin', TOUR_GUIDE_URL . 'assets/admin.css', array(), null );
     // Dépendances: driverjs, i18n, jquery, jquery-ui-sortable
-    wp_enqueue_script( 'tour-guide-admin', TOUR_GUIDE_URL . 'assets/admin.js', array( 'driverjs', 'wp-i18n', 'jquery', 'jquery-ui-sortable' ), TOUR_GUIDE_VERSION, true );
+    wp_enqueue_script( 'tour-guide-admin', TOUR_GUIDE_URL . 'assets/admin.js', array( 'driverjs', 'wp-i18n', 'jquery', 'jquery-ui-sortable' ), null, true );
 
     $data = array(
         'activeTemplates' => tour_guide_get_active_templates(),
@@ -96,7 +96,7 @@ function tour_guide_enqueue_front_assets() {
     wp_enqueue_script( 'driverjs' );
     wp_enqueue_style( 'driverjs-style' );
 
-    wp_enqueue_script( 'tour-guide-frontend', TOUR_GUIDE_URL . 'assets/frontend.js', array( 'driverjs' ), TOUR_GUIDE_VERSION, true );
+    wp_enqueue_script( 'tour-guide-frontend', TOUR_GUIDE_URL . 'assets/frontend.js', array( 'driverjs' ), null, true );
 }
 add_action( 'wp_enqueue_scripts', 'tour_guide_enqueue_front_assets' );
 
@@ -757,7 +757,7 @@ function tour_guide_enqueue_block_editor_assets() {
         'tour-guide-editor',
         TOUR_GUIDE_URL . 'assets/editor.js',
         array( 'wp-plugins', 'wp-edit-post', 'wp-element', 'wp-components', 'wp-i18n', 'driverjs' ),
-        TOUR_GUIDE_VERSION,
+        null,
         true
     );
 

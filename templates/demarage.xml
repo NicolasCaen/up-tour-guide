@@ -11,8 +11,24 @@
       <resume>none</resume>
     </step>
     <step selector="#menu-pages" position="right">
-      <title>Modification des pages</title>
-      <description>Accès à la modification des pages</description>
+      <title>Gestion des pages</title>
+      <description>Modification et ajout de pages</description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="#menu-posts-collection" position="top">
+      <title>Gestion des collections</title>
+      <description>Modification et ajout de collections</description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="#menu-posts-collection [href=&quot;edit-tags.php?taxonomy=categorie&amp;post_type=collection&quot;]" position="top">
+      <title>Catégorie de Collection</title>
+      <description></description>
       <action>none</action>
       <wait_timeout>0</wait_timeout>
       <delay_ms>0</delay_ms>
