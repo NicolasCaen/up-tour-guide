@@ -1,3 +1,166 @@
 /* Styles minimalistes pour l’admin du plugin Tour guidé */
 .wrap .widefat td, .wrap .widefat th { vertical-align: middle; }
 #wp-admin-bar-tour_guide_adminbar > .ab-item:before { content: "\f177"; top: 2px; }
+
+/* Éditeur de templates */
+#tour-guide-steps-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+#tour-guide-steps-table thead { display: none; }
+#tour-guide-steps-table tbody tr.tg-card {
+  display: grid;
+  grid-template-columns: 24px 1fr 1fr 1fr 240px; /* numéro + 3 colonnes + outils */
+  grid-template-areas:
+    'num selector position title tools'
+    'num description description description tools'
+    'num action action action tools'
+    'num wait wait wait tools';
+  gap: 8px 12px;
+  margin: 16px 0;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+#tour-guide-steps-table tbody tr.tg-card td { padding: 0; border: 0; }
+#tour-guide-steps-table tbody tr.tg-card .tg-sec-number { grid-area: num; align-self:start; }
+#tour-guide-steps-table tbody tr.tg-card .tg-sec-selector { grid-area: selector; }
+#tour-guide-steps-table tbody tr.tg-card .tg-sec-position { grid-area: position; }
+#tour-guide-steps-table tbody tr.tg-card .tg-sec-title { grid-area: title; }
+#tour-guide-steps-table tbody tr.tg-card .tg-sec-desc { grid-area: description; }
+#tour-guide-steps-table tbody tr.tg-card .tg-sec-action { grid-area: action; }
+#tour-guide-steps-table tbody tr.tg-card .tg-sec-wait { grid-area: wait; }
+#tour-guide-steps-table tbody tr.tg-card .tg-sec-resume { grid-area: tools; align-self: start; }
+#tour-guide-steps-table input[type="text"],
+#tour-guide-steps-table input[type="number"],
+#tour-guide-steps-table textarea,
+#tour-guide-steps-table select {
+  width: 100%;
+  box-sizing: border-box;
+}
+#tour-guide-steps-table textarea {
+  min-height: 48px;
+}
+
+/* En-têtes embarqués par cellule */
+.tg-cell-label {
+  display: block;
+  font-size: 12px;
+  color: #646970;
+  margin-bottom: 4px;
+}
+
+/* Drag & Drop */
+.tg-handle {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: middle;
+  cursor: grab;
+  user-select: none;
+}
+.tg-handle:before {
+  content: "\f545"; /* dashicons-move */
+  font-family: dashicons;
+  font-size: 14px;
+  line-height: 14px;
+  color: #646970;
+}
+.tg-sort-placeholder td {
+  background: #eaf2fa !important;
+  border-top: 2px dashed #72aee6;
+  border-bottom: 2px dashed #72aee6;
+}
+#tour-guide-steps-table tbody tr td:first-child {
+  white-space: nowrap;
+}
+.tg-step-number {
+  margin-left: 6px;
+}
+.tg-row-actions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+
+/* Icône d’aide */
+.tg-info {
+  display: inline-block;
+  width: 16px; height: 16px;
+  line-height: 16px; text-align:center;
+  margin-left: 6px; border-radius: 50%;
+  background:#eef0f2; color:#50575e; font-size:11px;
+}
+.tg-info:hover { background:#e2e6ea; }
+
+/* Collapse */
+.tg-collapsed .tg-subfield { display:none; }
+.tg-collapsed .tg-subfield:first-of-type { display:block; } /* garder l’action select visible */
+
+/* Sections cartes: labels + grille 2 colonnes pour sous-champs */
+.tg-sec-title .tg-cell-label::before { content: 'Titre'; }
+.tg-sec-desc .tg-cell-label::before { content: 'Description'; }
+.tg-sec-selector .tg-cell-label::before { content: 'Sélecteur CSS'; }
+.tg-sec-position .tg-cell-label::before { content: 'Position'; }
+.tg-sec-action .tg-cell-label::before { content: 'Action'; }
+.tg-sec-wait .tg-cell-label::before { content: 'Attendre'; }
+.tg-sec-resume .tg-cell-label::before { content: 'Reprendre'; }
+
+.tg-sec-action, .tg-sec-wait {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr 1fr;
+  column-gap: 12px;
+}
+.tg-sec-action .tg-cell-label,
+.tg-sec-wait .tg-cell-label {
+  grid-column: 1 / -1;
+  cursor: pointer;
+}
+.tg-sec-action select[name^="step_action"],
+.tg-sec-resume select[name^="step_resume"] {
+  max-width: 220px;
+}
+.tg-sec-action input[type="text"],
+.tg-sec-wait input[type="text"],
+.tg-sec-wait input[type="number"] {
+  width: 100%;
+}
+
+/* Utilitaires d'affichage */
+.tg-hidden { display: none !important; }
+
+/* Colonnes orchestration: style compact et lisible */
+#tour-guide-steps-table input[name^="step_action_selector"],
+#tour-guide-steps-table input[name^="step_navigate_to"],
+#tour-guide-steps-table input[name^="step_wait_for"],
+#tour-guide-steps-table input[name^="step_wait_timeout"],
+#tour-guide-steps-table input[name^="step_delay_ms"] {
+  margin-top: 6px;
+  font-size: 12px;
+}
+#tour-guide-steps-table select[name^="step_action"],
+#tour-guide-steps-table select[name^="step_resume"] {
+  font-size: 12px;
+}
+
+/* Aides visuelles */
+.wrap .description { color: #646970; }
+
+/* Sous-champs compacts */
+.tg-subfield label {
+  display: block;
+  font-size: 12px;
+  color: #646970;
+  margin-top: 6px;
+}
+.tg-subfield input {
+  margin-top: 2px;
+}
+
+/* Dropdown custom (admin bar) */
+#tour-guide-dropdown a {
+  cursor: pointer;
+}
+#tour-guide-dropdown a:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px #2271b1;
+}

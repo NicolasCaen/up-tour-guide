@@ -2,7 +2,7 @@
 /**
  * Plugin Name: up-Tour guidé
  * Description: Visites guidées pour WordPress (Gutenberg et interface d’admin) avec Driver.js, gestion de templates XML activables.
- * Version: 0.1.3.0
+ * Version: 0.1.4.0
  * Author: GEHIN Nicolas
  * Text Domain: tour-guide
  * Domain Path: /languages
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'TOUR_GUIDE_VERSION', '0.1.3.0' );
+define( 'TOUR_GUIDE_VERSION', '0.1.4.0' );
 define( 'TOUR_GUIDE_FILE', __FILE__ );
 define( 'TOUR_GUIDE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TOUR_GUIDE_URL', plugin_dir_url( __FILE__ ) );
@@ -69,10 +69,13 @@ add_action( 'init', 'tour_guide_enqueue_common_assets' );
 
 function tour_guide_enqueue_admin_assets( $hook ) {
     wp_enqueue_script( 'driverjs' );
+    // Pour le drag & drop des étapes
+    wp_enqueue_script( 'jquery-ui-sortable' );
     wp_enqueue_style( 'driverjs-style' );
 
     wp_enqueue_style( 'tour-guide-admin', TOUR_GUIDE_URL . 'assets/admin.css', array(), TOUR_GUIDE_VERSION );
-    wp_enqueue_script( 'tour-guide-admin', TOUR_GUIDE_URL . 'assets/admin.js', array( 'driverjs', 'wp-i18n' ), TOUR_GUIDE_VERSION, true );
+    // Dépendances: driverjs, i18n, jquery, jquery-ui-sortable
+    wp_enqueue_script( 'tour-guide-admin', TOUR_GUIDE_URL . 'assets/admin.js', array( 'driverjs', 'wp-i18n', 'jquery', 'jquery-ui-sortable' ), TOUR_GUIDE_VERSION, true );
 
     $data = array(
         'activeTemplates' => tour_guide_get_active_templates(),
@@ -282,6 +285,9 @@ function tour_guide_render_templates_page() {
                         <th><?php echo esc_html__( 'Titre', 'tour-guide' ); ?></th>
                         <th><?php echo esc_html__( 'Description', 'tour-guide' ); ?></th>
                         <th><?php echo esc_html__( 'Position', 'tour-guide' ); ?></th>
+                        <th><?php echo esc_html__( 'Action', 'tour-guide' ); ?></th>
+                        <th><?php echo esc_html__( 'Attendre (wait_for)', 'tour-guide' ); ?></th>
+                        <th><?php echo esc_html__( 'Reprendre (resume)', 'tour-guide' ); ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -289,14 +295,24 @@ function tour_guide_render_templates_page() {
                     $existing_steps = $editing_template ? $editing_template['steps'] : array();
                     $rows_count = max( count( $existing_steps ), 1 );
                     for ( $i = 0; $i < $rows_count; $i++ ) {
-                        $step = isset( $existing_steps[ $i ] ) ? $existing_steps[ $i ] : array( 'selector' => '', 'title' => '', 'description' => '', 'position' => '' );
+                        $step = isset( $existing_steps[ $i ] ) ? $existing_steps[ $i ] : array( 'selector' => '', 'title' => '', 'description' => '', 'position' => '', 'action' => 'none', 'action_selector' => '', 'wait_for' => '', 'wait_timeout' => '', 'delay_ms' => '', 'navigate_to' => '', 'resume' => 'none' );
                         ?>
                         <tr>
-                            <td><?php echo ( $i + 1 ); ?></td>
-                            <td><input type="text" name="step_selector[]" value="<?php echo esc_attr( $step['selector'] ); ?>" class="regular-text" /></td>
-                            <td><input type="text" name="step_title[]" value="<?php echo esc_attr( $step['title'] ); ?>" class="regular-text" /></td>
-                            <td><textarea name="step_description[]" rows="2" class="large-text"><?php echo esc_textarea( $step['description'] ); ?></textarea></td>
-                            <td>
+                            <td class="tg-sec-number"><?php echo ( $i + 1 ); ?></td>
+                            <td class="tg-sec-selector">
+                                <span class="tg-cell-label"><span class="tg-info" title="Sélecteur CSS de l’élément ciblé (ex: #menu-appearance, .my-class)">i</span></span>
+                                <input type="text" name="step_selector[]" value="<?php echo esc_attr( $step['selector'] ); ?>" class="regular-text" />
+                            </td>
+                            <td class="tg-sec-title">
+                                <span class="tg-cell-label"><span class="tg-info" title="Titre affiché dans la popover Driver.js">i</span></span>
+                                <input type="text" name="step_title[]" value="<?php echo esc_attr( $step['title'] ); ?>" class="regular-text" />
+                            </td>
+                            <td class="tg-sec-desc">
+                                <span class="tg-cell-label"><span class="tg-info" title="Description affichée dans la popover">i</span></span>
+                                <textarea name="step_description[]" rows="2" class="large-text"><?php echo esc_textarea( $step['description'] ); ?></textarea>
+                            </td>
+                            <td class="tg-sec-position">
+                                <span class="tg-cell-label"><span class="tg-info" title="Position de la popover par rapport à l’élément (top/right/bottom/left/center)">i</span></span>
                                 <select name="step_position[]">
                                     <?php
                                     $positions = array( 'top', 'right', 'bottom', 'left', 'center' );
@@ -304,6 +320,50 @@ function tour_guide_render_templates_page() {
                                         echo '<option value="' . esc_attr( $pos ) . '" ' . selected( $step['position'], $pos, false ) . '>' . esc_html( ucfirst( $pos ) ) . '</option>';
                                     }
                                     ?>
+                                </select>
+                            </td>
+                            <td class="tg-sec-action">
+                                <span class="tg-cell-label"><span class="tg-info" title="Définir une action automatique (ex: clic) et/ou une navigation, avant d’afficher la popover">i</span></span>
+                                <div class="tg-subfield">
+                                    <label>Action automatique</label>
+                                    <select name="step_action[]">
+                                    <?php $actions = array( 'none' => __( 'Aucune', 'tour-guide' ), 'click' => __( 'Clique', 'tour-guide' ) );
+                                    foreach ( $actions as $val => $lab ) {
+                                        echo '<option value="' . esc_attr( $val ) . '" ' . selected( isset($step['action'])?$step['action']:'none', $val, false ) . '>' . esc_html( $lab ) . '</option>';
+                                    } ?>
+                                    </select>
+                                </div>
+                                <div class="tg-subfield">
+                                    <label>Sélecteur pour l’action (optionnel)</label>
+                                    <input type="text" name="step_action_selector[]" value="<?php echo esc_attr( isset($step['action_selector'])?$step['action_selector']:'' ); ?>" placeholder="ex: #menu-appearance" class="regular-text" />
+                                </div>
+                                <div class="tg-subfield">
+                                    <label>Naviguer vers (optionnel)</label>
+                                    <input type="text" name="step_navigate_to[]" value="<?php echo esc_attr( isset($step['navigate_to'])?$step['navigate_to']:'' ); ?>" placeholder="ex: site-editor.php" class="regular-text" />
+                                </div>
+                            </td>
+                            <td class="tg-sec-wait">
+                                <span class="tg-cell-label"><span class="tg-info" title="Attendre l’apparition d’un sélecteur, avec timeout (ms) et un délai optionnel avant d’avancer">i</span></span>
+                                <div class="tg-subfield">
+                                    <label>Attendre le sélecteur</label>
+                                    <input type="text" name="step_wait_for[]" value="<?php echo esc_attr( isset($step['wait_for'])?$step['wait_for']:'' ); ?>" placeholder="ex: .navigation-navigation-item" class="regular-text" />
+                                </div>
+                                <div class="tg-subfield">
+                                    <label>Temps max (ms)</label>
+                                    <input type="number" name="step_wait_timeout[]" value="<?php echo esc_attr( isset($step['wait_timeout'])?$step['wait_timeout']:'' ); ?>" placeholder="ex: 4000" class="small-text" />
+                                </div>
+                                <div class="tg-subfield">
+                                    <label>Délai (ms)</label>
+                                    <input type="number" name="step_delay_ms[]" value="<?php echo esc_attr( isset($step['delay_ms'])?$step['delay_ms']:'' ); ?>" placeholder="ex: 200" class="small-text" />
+                                </div>
+                            </td>
+                            <td class="tg-sec-resume">
+                                <span class="tg-cell-label"><span class="tg-info" title="Reprise automatique après navigation (ex: passer à l’étape suivante)">i</span></span>
+                                <select name="step_resume[]">
+                                    <?php $resumes = array( 'none' => __( 'Aucune', 'tour-guide' ), 'auto' => __( 'Auto', 'tour-guide' ) );
+                                    foreach ( $resumes as $val => $lab ) {
+                                        echo '<option value="' . esc_attr( $val ) . '" ' . selected( isset($step['resume'])?$step['resume']:'none', $val, false ) . '>' . esc_html( $lab ) . '</option>';
+                                    } ?>
                                 </select>
                             </td>
                         </tr>
@@ -374,11 +434,20 @@ function tour_guide_load_template_for_edit( $internal_id ) {
             $steps_raw = tour_guide_parse_template_steps( $path );
             $steps = array();
             foreach ( $steps_raw as $s ) {
+                $orch = isset( $s['orchestrate'] ) && is_array( $s['orchestrate'] ) ? $s['orchestrate'] : array();
                 $steps[] = array(
-                    'selector'    => isset( $s['element'] ) ? $s['element'] : '',
-                    'title'       => isset( $s['popover']['title'] ) ? $s['popover']['title'] : '',
-                    'description' => isset( $s['popover']['description'] ) ? $s['popover']['description'] : '',
-                    'position'    => isset( $s['popover']['position'] ) ? $s['popover']['position'] : 'bottom',
+                    'selector'        => isset( $s['element'] ) ? $s['element'] : '',
+                    'title'           => isset( $s['popover']['title'] ) ? $s['popover']['title'] : '',
+                    'description'     => isset( $s['popover']['description'] ) ? $s['popover']['description'] : '',
+                    'position'        => isset( $s['popover']['position'] ) ? $s['popover']['position'] : 'bottom',
+                    // Orchestration
+                    'action'          => isset( $orch['action'] ) ? $orch['action'] : 'none',
+                    'action_selector' => isset( $orch['action_selector'] ) ? $orch['action_selector'] : '',
+                    'wait_for'        => isset( $orch['wait_for'] ) ? $orch['wait_for'] : '',
+                    'wait_timeout'    => isset( $orch['wait_timeout'] ) ? $orch['wait_timeout'] : '',
+                    'delay_ms'        => isset( $orch['delay_ms'] ) ? $orch['delay_ms'] : '',
+                    'navigate_to'     => isset( $orch['navigate_to'] ) ? $orch['navigate_to'] : '',
+                    'resume'          => isset( $orch['resume'] ) ? $orch['resume'] : 'none',
                 );
             }
 
@@ -427,9 +496,16 @@ function tour_guide_handle_save_template_post() {
     $titles       = isset( $_POST['step_title'] ) ? (array) $_POST['step_title'] : array();
     $descriptions = isset( $_POST['step_description'] ) ? (array) $_POST['step_description'] : array();
     $positions    = isset( $_POST['step_position'] ) ? (array) $_POST['step_position'] : array();
+    $actions      = isset( $_POST['step_action'] ) ? (array) $_POST['step_action'] : array();
+    $act_selectors= isset( $_POST['step_action_selector'] ) ? (array) $_POST['step_action_selector'] : array();
+    $wait_for     = isset( $_POST['step_wait_for'] ) ? (array) $_POST['step_wait_for'] : array();
+    $wait_timeout = isset( $_POST['step_wait_timeout'] ) ? (array) $_POST['step_wait_timeout'] : array();
+    $delay_ms     = isset( $_POST['step_delay_ms'] ) ? (array) $_POST['step_delay_ms'] : array();
+    $navigate_to  = isset( $_POST['step_navigate_to'] ) ? (array) $_POST['step_navigate_to'] : array();
+    $resume       = isset( $_POST['step_resume'] ) ? (array) $_POST['step_resume'] : array();
 
     $steps = array();
-    $count = max( count( $selectors ), count( $titles ), count( $descriptions ), count( $positions ) );
+    $count = max( count( $selectors ), count( $titles ), count( $descriptions ), count( $positions ), count($actions), count($act_selectors), count($wait_for), count($wait_timeout), count($delay_ms), count($navigate_to), count($resume) );
     for ( $i = 0; $i < $count; $i++ ) {
         $sel  = isset( $selectors[ $i ] ) ? trim( wp_unslash( $selectors[ $i ] ) ) : '';
         $st   = isset( $titles[ $i ] ) ? trim( wp_unslash( $titles[ $i ] ) ) : '';
@@ -446,6 +522,13 @@ function tour_guide_handle_save_template_post() {
             'title'       => $st,
             'description' => $desc,
             'position'    => $pos,
+            'action'      => isset($actions[$i]) ? sanitize_text_field( wp_unslash($actions[$i]) ) : 'none',
+            'action_selector' => isset($act_selectors[$i]) ? trim( wp_unslash($act_selectors[$i]) ) : '',
+            'wait_for'    => isset($wait_for[$i]) ? trim( wp_unslash($wait_for[$i]) ) : '',
+            'wait_timeout'=> isset($wait_timeout[$i]) ? intval($wait_timeout[$i]) : '',
+            'delay_ms'    => isset($delay_ms[$i]) ? intval($delay_ms[$i]) : '',
+            'navigate_to' => isset($navigate_to[$i]) ? trim( wp_unslash($navigate_to[$i]) ) : '',
+            'resume'      => isset($resume[$i]) ? sanitize_text_field( wp_unslash($resume[$i]) ) : 'none',
         );
     }
 
@@ -511,10 +594,24 @@ function tour_guide_build_template_xml( $attr_id, $title, $steps, $context = 'al
         $st       = isset( $step['title'] ) ? $step['title'] : '';
         $desc     = isset( $step['description'] ) ? $step['description'] : '';
         $pos      = isset( $step['position'] ) ? $step['position'] : 'bottom';
+        $action   = isset( $step['action'] ) ? $step['action'] : '';
+        $action_selector = isset( $step['action_selector'] ) ? $step['action_selector'] : '';
+        $wait_for = isset( $step['wait_for'] ) ? $step['wait_for'] : '';
+        $wait_timeout = isset( $step['wait_timeout'] ) ? $step['wait_timeout'] : '';
+        $delay_ms = isset( $step['delay_ms'] ) ? $step['delay_ms'] : '';
+        $navigate_to = isset( $step['navigate_to'] ) ? $step['navigate_to'] : '';
+        $resume  = isset( $step['resume'] ) ? $step['resume'] : '';
 
         $xml .= '    <step selector="' . esc_attr( $selector ) . '" position="' . esc_attr( $pos ) . '">' . "\n";
         $xml .= '      <title>' . esc_html( $st ) . '</title>' . "\n";
         $xml .= '      <description>' . esc_html( $desc ) . '</description>' . "\n";
+        if ( $action )        { $xml .= '      <action>' . esc_html( $action ) . '</action>' . "\n"; }
+        if ( $action_selector ){ $xml .= '      <action_selector>' . esc_html( $action_selector ) . '</action_selector>' . "\n"; }
+        if ( $wait_for )      { $xml .= '      <wait_for>' . esc_html( $wait_for ) . '</wait_for>' . "\n"; }
+        if ( $wait_timeout!=='' ) { $xml .= '      <wait_timeout>' . intval( $wait_timeout ) . '</wait_timeout>' . "\n"; }
+        if ( $delay_ms!=='' )    { $xml .= '      <delay_ms>' . intval( $delay_ms ) . '</delay_ms>' . "\n"; }
+        if ( $navigate_to )   { $xml .= '      <navigate_to>' . esc_html( $navigate_to ) . '</navigate_to>' . "\n"; }
+        if ( $resume )        { $xml .= '      <resume>' . esc_html( $resume ) . '</resume>' . "\n"; }
         $xml .= "    </step>\n";
     }
     $xml .= "  </steps>\n";
@@ -634,12 +731,31 @@ function tour_guide_parse_template_steps( $filepath ) {
                 $position = isset( $step['position'] ) ? (string) $step['position'] : 'bottom';
                 $title    = isset( $step->title ) ? trim( (string) $step->title ) : '';
                 $desc     = isset( $step->description ) ? trim( (string) $step->description ) : '';
+                // Orchestration (facultatif)
+                $action   = isset( $step->action ) ? trim( (string) $step->action ) : '';
+                $action_selector = isset( $step->action_selector ) ? trim( (string) $step->action_selector ) : '';
+                $wait_for = isset( $step->wait_for ) ? trim( (string) $step->wait_for ) : '';
+                $wait_timeout = isset( $step->wait_timeout ) ? intval( (string) $step->wait_timeout ) : '';
+                $delay_ms = isset( $step->delay_ms ) ? intval( (string) $step->delay_ms ) : '';
+                $navigate_to = isset( $step->navigate_to ) ? trim( (string) $step->navigate_to ) : '';
+                $resume  = isset( $step->resume ) ? trim( (string) $step->resume ) : '';
+
                 $results[] = array(
                     'element' => $selector,
                     'popover' => array(
                         'title'       => $title,
                         'description' => $desc,
                         'position'    => $position,
+                    ),
+                    // Exposer aussi au JS
+                    'orchestrate' => array(
+                        'action' => $action,
+                        'action_selector' => $action_selector,
+                        'wait_for' => $wait_for,
+                        'wait_timeout' => $wait_timeout,
+                        'delay_ms' => $delay_ms,
+                        'navigate_to' => $navigate_to,
+                        'resume' => $resume,
                     ),
                 );
             }

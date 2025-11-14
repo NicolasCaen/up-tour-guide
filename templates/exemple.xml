@@ -1,13 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <template id="exemple" title="Découverte rapide de l’interface" context="admin">
   <steps>
-    <step selector="body" position="center">
-      <title>Bienvenue</title>
-      <description>Cette visite présente rapidement l’interface.</description>
-    </step>
     <step selector="#wpadminbar" position="bottom">
       <title>Barre d’admin</title>
       <description>Accédez rapidement aux fonctions d’administration.</description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="#adminmenuback" position="right">
+      <title>Bienvenue</title>
+      <description>Cette visite présente rapidement l’interface.</description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
     </step>
   </steps>
 </template>
