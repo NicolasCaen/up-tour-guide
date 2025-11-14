@@ -108,7 +108,8 @@
     };
 
     var driver = createDriverInstance(Object.assign({
-      allowClose: true,
+      // Ne pas fermer le tour en cliquant en dehors de la popover
+      allowClose: false,
       animate: true,
       opacity: 0.2,
       showButtons: ['previous','next','close'],
@@ -122,6 +123,8 @@
     try{
       if (typeof driver.setConfig==='function'){
         driver.setConfig(Object.assign({ 
+          // Ne pas autoriser la fermeture en cliquant en dehors de la popover
+          allowClose:false,
           showButtons:['previous','next','close'], 
           nextBtnText:'Suivant', 
           prevBtnText:'Précédent', 
