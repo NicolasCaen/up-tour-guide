@@ -1,29 +1,68 @@
 (function(){
-  if (typeof Driver === 'undefined') { return; }
+  function createDriverInstance(options){
+    if (typeof Driver !== 'undefined') { return new Driver(options || {}); }
+    if (typeof window !== 'undefined' && window.driver && window.driver.js && typeof window.driver.js.driver === 'function') {
+      try { return window.driver.js.driver(options || {}); } catch(e) { return null; }
+    }
+    return null;
+  }
+
   function startTour(steps){
+    var driver = createDriverInstance({
+      allowClose: true,
+      animate: true,
+      opacity: 0.2,
+      showButtons: ['previous','next','close'],
+      nextBtnText: 'Suivant',
+      prevBtnText: 'Précédent',
+      closeBtnText: 'Fermer',
+      doneBtnText: 'Terminer'
+    });
+    if (!driver) { console.warn('[Tour Guide Admin] Driver introuvable'); return; }
     try {
-      var driver = new Driver({ allowClose: true, animate: true, opacity: 0.2 });
-      driver.defineSteps(steps || []);
-      driver.start();
-    } catch(e) { /* no-op */ }
+      if (typeof driver.setConfig === 'function') {
+        try { driver.setConfig({
+          showButtons: ['previous','next','close'],
+          nextBtnText: 'Suivant',
+          prevBtnText: 'Précédent',
+          closeBtnText: 'Fermer',
+          doneBtnText: 'Terminer'
+        }); } catch(_) {}
+      }
+      if (typeof driver.defineSteps === 'function' && typeof driver.start === 'function') {
+        driver.defineSteps(steps || []);
+        driver.start();
+      } else if (typeof driver.setSteps === 'function' && typeof driver.drive === 'function') {
+        driver.setSteps(steps || []);
+        driver.drive();
+      } else {
+        console.warn('[Tour Guide Admin] API Driver inconnue');
+      }
+    } catch(e) { console.error('[Tour Guide Admin] Erreur démarrage visite', e); }
   }
   document.addEventListener('DOMContentLoaded', function(){
     var data = window.TOUR_GUIDE_DATA || {};
     var tours = Array.isArray(data.tours) ? data.tours : [];
-    
-    // DEBUG: afficher ce qui est chargé
-    console.log('[Tour Guide] Driver.js loaded:', typeof Driver !== 'undefined');
-    console.log('[Tour Guide] Tours disponibles:', tours.length);
-    console.log('[Tour Guide] Data complète:', data);
-    
-    // Pour chaque tour, lier le clic sur le menu admin bar
+
+    // DEBUG
+    console.log('[Tour Guide Admin] Tours disponibles:', tours.length);
+
+    // Lier les clics via l'id généré par l'admin bar: #wp-admin-bar-tour_guide_tour_<id>
     tours.forEach(function(tour){
-      var menuItem = document.querySelector('.tour-guide-start-tour[data-tour-id="' + tour.id + '"]');
+      var itemId = 'wp-admin-bar-tour_guide_tour_' + tour.id.replace(/[^a-z0-9_-]/gi, '');
+      var menuItem = document.getElementById(itemId);
+      if (!menuItem) {
+        // Fallback: chercher par préfixe et texte
+        var candidates = document.querySelectorAll('[id^="wp-admin-bar-tour_guide_tour_"]');
+        candidates.forEach(function(el){
+          if (!menuItem && el.textContent && el.textContent.trim() === tour.title) { menuItem = el; }
+        });
+      }
       if (menuItem) {
-        menuItem.addEventListener('click', function(e){ 
-          e.preventDefault(); 
+        menuItem.addEventListener('click', function(e){
+          e.preventDefault();
           e.stopPropagation();
-          startTour(tour.steps); 
+          startTour(tour.steps);
         });
       }
     });

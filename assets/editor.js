@@ -33,7 +33,8 @@
       showButtons: ['previous','next','close'],
       nextBtnText: 'Suivant',
       prevBtnText: 'Précédent',
-      closeBtnText: 'Fermer'
+      closeBtnText: 'Fermer',
+      doneBtnText: 'Terminer'
     });
     console.log('[Tour Guide Editor] startEditorTour called, driver instance:', driver);
     if (!driver) { console.warn('[Tour Guide Editor] Aucun driver disponible'); return; }
@@ -45,7 +46,8 @@
           showButtons: ['previous','next','close'],
           nextBtnText: 'Suivant',
           prevBtnText: 'Précédent',
-          closeBtnText: 'Fermer'
+          closeBtnText: 'Fermer',
+          doneBtnText: 'Terminer'
         }); } catch(_) {}
       }
       if (typeof driver.defineSteps === 'function' && typeof driver.start === 'function') {
