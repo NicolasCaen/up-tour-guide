@@ -2,7 +2,7 @@
 /**
  * Plugin Name: up-Tour guidé
  * Description: Visites guidées pour WordPress (Gutenberg et interface d’admin) avec Driver.js, gestion de templates XML activables.
- * Version: 0.1.4.0
+ * Version: 0.1.5.0
  * Author: GEHIN Nicolas
  * Text Domain: tour-guide
  * Domain Path: /languages
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'TOUR_GUIDE_VERSION', '0.1.4.0' );
+define( 'TOUR_GUIDE_VERSION', '0.1.5.0' );
 define( 'TOUR_GUIDE_FILE', __FILE__ );
 define( 'TOUR_GUIDE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TOUR_GUIDE_URL', plugin_dir_url( __FILE__ ) );
@@ -81,6 +81,7 @@ function tour_guide_enqueue_admin_assets( $hook ) {
         'activeTemplates' => tour_guide_get_active_templates(),
         'templateFiles'   => tour_guide_list_all_templates(),
         'isAdmin'         => is_admin(),
+        'adminUrl'        => admin_url( 'admin.php?page=tour-guide-templates' ),
         'i18n'            => array(
             'startTour' => __( 'Démarrer la visite', 'tour-guide' ),
         ),
@@ -104,42 +105,15 @@ function tour_guide_admin_bar( $wp_admin_bar ) {
     if ( ! is_user_logged_in() || ! current_user_can( 'edit_posts' ) ) {
         return;
     }
+    // On crée uniquement le menu principal, sans sous-menus
+    // Le dropdown custom JS gérera l'affichage de la liste des tours
     $args = array(
         'id'    => 'tour_guide_adminbar',
         'title' => __( 'Visites guidées', 'tour-guide' ),
         'href'  => '#',
+        'meta'  => array( 'class' => 'tour-guide-custom-dropdown' ),
     );
     $wp_admin_bar->add_node( $args );
-
-    // Lister chaque template actif comme sous-menu
-    $context = is_admin() ? 'admin' : 'front';
-    $tours = tour_guide_get_tours_by_template( true, $context );
-    
-    if ( ! empty( $tours ) ) {
-        foreach ( $tours as $tour ) {
-            $wp_admin_bar->add_node( array(
-                'id'     => 'tour_guide_tour_' . sanitize_key( $tour['id'] ),
-                'parent' => 'tour_guide_adminbar',
-                'title'  => esc_html( $tour['title'] ),
-                'href'   => '#',
-                'meta'   => array( 'class' => 'tour-guide-start-tour', 'data-tour-id' => esc_attr( $tour['id'] ) ),
-            ) );
-        }
-    } else {
-        $wp_admin_bar->add_node( array(
-            'id'     => 'tour_guide_none',
-            'parent' => 'tour_guide_adminbar',
-            'title'  => __( 'Aucune visite disponible', 'tour-guide' ),
-            'href'   => '#',
-        ) );
-    }
-
-    $wp_admin_bar->add_node( array(
-        'id'     => 'tour_guide_manage',
-        'parent' => 'tour_guide_adminbar',
-        'title'  => __( 'Gérer les templates', 'tour-guide' ),
-        'href'   => admin_url( 'admin.php?page=tour-guide-templates' ),
-    ) );
 }
 add_action( 'admin_bar_menu', 'tour_guide_admin_bar', 80 );
 

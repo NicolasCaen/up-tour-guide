@@ -1,0 +1,506 @@
+(function(){
+  function createDriverInstance(options){
+    if (typeof Driver !== 'undefined') { return new Driver(options || {}); }
+    if (typeof window !== 'undefined' && window.driver && window.driver.js && typeof window.driver.js.driver === 'function') {
+      try { return window.driver.js.driver(options || {}); } catch(e) { return null; }
+    }
+    return null;
+  }   // (binding collapse déplacé plus bas, après définition de stepsTable)
+
+    // MENU CUSTOM anti-fermeture (toggle sur le bouton principal)
+    (function(){
+      var mainBtn = document.querySelector('#wp-admin-bar-tour_guide_adminbar > a.ab-item');
+      if (!mainBtn) return;
+
+      var dropdownId = 'tour-guide-dropdown';
+      function ensureDropdown(){
+        var dd = document.getElementById(dropdownId);
+        if (dd) return dd;
+        dd = document.createElement('div');
+        dd.id = dropdownId;
+        dd.style.position = 'fixed';
+        dd.style.top = '0px';
+        dd.style.left = '0px';
+        dd.style.background = '#23282d';
+        dd.style.border = '1px solid #2c3338';
+        dd.style.padding = '6px 0';
+        dd.style.minWidth = '220px';
+        dd.style.display = 'none';
+        dd.style.zIndex = '100000';
+        // Empêcher la fermeture lorsque l’on clique dedans
+        dd.addEventListener('click', function(e){ e.stopPropagation(); }, false);
+        dd.addEventListener('mousedown', function(e){ e.stopPropagation(); }, false);
+        document.body.appendChild(dd);
+        return dd;
+      }
+      function computePosition(){
+        if (!mainBtn || !open) return;
+        var r = mainBtn.getBoundingClientRect();
+        dd.style.top = Math.round(r.bottom) + 'px';
+        dd.style.left = Math.round(r.left) + 'px';
+      }
+
+      function renderItems(dd){
+        dd.innerHTML = '';
+        if (!tours.length){
+          var empty = document.createElement('div');
+          empty.textContent = 'Aucune visite disponible';
+          empty.style.padding = '10px 12px';
+          dd.appendChild(empty);
+          return;
+        }
+        tours.forEach(function(t){
+          var a = document.createElement('a');
+          a.href = '#';
+          a.textContent = t.title;
+          a.style.display = 'block';
+          a.style.padding = '10px 12px';
+          a.style.color = '#fff';
+          a.style.textDecoration = 'none';
+          a.addEventListener('mouseenter', function(){ a.style.background = '#2c3338'; });
+          a.addEventListener('mouseleave', function(){ a.style.background = 'transparent'; });
+          a.addEventListener('click', function(ev){ ev.preventDefault(); ev.stopPropagation(); hide(); startTour(t.steps, t.id); });
+          dd.appendChild(a);
+        });
+      }
+
+      var open = false;
+      var overBtn = false;
+      var overDd = false;
+      var closeT = null;
+      var dd = ensureDropdown();
+      function show(){
+        renderItems(dd);
+        dd.style.display = 'block';
+        open = true;
+        computePosition();
+      }
+      function hide(){
+        dd.style.display = 'none';
+        open = false;
+      }
+      function scheduleClose(){
+        if (closeT) { clearTimeout(closeT); closeT = null; }
+        closeT = setTimeout(function(){
+          if (!overBtn && !overDd && open) hide();
+        }, 200);
+      }
+      function toggle(ev){ ev.preventDefault(); ev.stopPropagation(); open ? hide() : show(); }
+
+      mainBtn.addEventListener('click', toggle, false);
+      mainBtn.addEventListener('mouseenter', function(){ overBtn = true; if (open) { if (closeT){ clearTimeout(closeT); closeT=null; } } }, false);
+      mainBtn.addEventListener('mouseleave', function(){ overBtn = false; if (open) scheduleClose(); }, false);
+      dd.addEventListener('mouseenter', function(){ overDd = true; if (closeT){ clearTimeout(closeT); closeT=null; } }, false);
+      dd.addEventListener('mouseleave', function(){ overDd = false; scheduleClose(); }, false);
+      document.addEventListener('click', function(e){
+        if (!open) return;
+        var insideBtn = e.target && (e.target === mainBtn || mainBtn.contains(e.target));
+        var insideDd = e.target && (e.target === dd || dd.contains(e.target));
+        if (!insideBtn && !insideDd) hide();
+      }, false);
+      document.addEventListener('keydown', function(e){ if (open && e.key==='Escape'){ hide(); } }, true);
+      window.addEventListener('resize', function(){ if (open){ computePosition(); } });
+      window.addEventListener('scroll', function(){ if (open){ computePosition(); } }, true);
+    })();
+
+    // Gestion visibilité des champs d'action
+    function applyActionVisibilityForRow(tr){
+      if (!tr) return;
+      var actionSel = tr.querySelector('select[name="step_action[]"]');
+      var show = actionSel && actionSel.value !== 'none';
+      // Champs concernés dans la même ligne
+      var actionSelector = tr.querySelector('input[name="step_action_selector[]"]');
+      var navigateTo = tr.querySelector('input[name="step_navigate_to[]"]');
+      // On masque seulement ces champs spécifiques d'action
+      [actionSelector, navigateTo].forEach(function(el){ if (!el) return; el.classList.toggle('tg-hidden', !show); });
+    }
+    function applyActionVisibilityAll(){
+      var tbody = document.querySelector('#tour-guide-steps-table tbody');
+      if (!tbody) return;
+      Array.prototype.forEach.call(tbody.querySelectorAll('tr'), applyActionVisibilityForRow);
+    }
+    applyActionVisibilityAll();
+    // Collapse/Expand désactivé temporairement
+    stepsTable && stepsTable.addEventListener('change', function(e){
+      if (e.target && e.target.name === 'step_action[]'){
+        var tr = e.target.closest('tr');
+        applyActionVisibilityForRow(tr);
+      }
+    });
+  }
+
+  function startTour(steps, tourId){
+    console.log('[Tour Guide Admin] startTour called, tourId:', tourId, 'steps:', Array.isArray(steps)?steps.length:'?');
+    var driver = createDriverInstance({
+      allowClose: true,
+      animate: true,
+      opacity: 0.2,
+      showButtons: ['previous','next','close'],
+      nextBtnText: 'Suivant',
+      prevBtnText: 'Précédent',
+      closeBtnText: 'Fermer',
+      doneBtnText: 'Terminer'
+    });
+    if (!driver) { console.warn('[Tour Guide Admin] Driver introuvable'); return; }
+    function mapStepsForDriver(arr){
+      return (arr||[]).map(function(s){
+        var step = Object.assign({}, s);
+        // Normaliser element
+        step.element = step.element || step.selector || 'body';
+        // Si c'est un sélecteur string mais introuvable, fallback à body
+        if (typeof step.element === 'string' && !document.querySelector(step.element)) {
+          step.element = 'body';
+        }
+        // Normaliser popover - laisser description en string, Driver.js gère le HTML nativement
+        var pop = step.popover || { title: step.title, description: step.description, position: step.position };
+        step.popover = pop;
+        return step;
+      });
+    }
+    if (typeof driver.setSteps === 'function'){
+      var _setSteps = driver.setSteps.bind(driver);
+      driver.setSteps = function(stepsArg){ return _setSteps(mapStepsForDriver(stepsArg)); };
+    }
+    // Détection: y a-t-il une orchestration quelconque ?
+    function hasOrchestration(arr){
+      return (arr||[]).some(function(s){
+        var o = (s && s.orchestrate) ? s.orchestrate : {};
+        if (!o) return false;
+        if (o.action && o.action !== 'none') return true;
+        if (o.navigate_to && o.navigate_to.trim()) return true;
+        if (o.wait_for && o.wait_for.trim()) return true;
+        if (typeof o.delay_ms === 'number' && o.delay_ms > 0) return true;
+        // NOTE: resume seul ne déclenche plus l’orchestrateur
+        return false;
+      });
+    }
+
+    (async function(){
+      try{
+        var indexToStart = 0;
+        if (hasOrchestration(steps)){
+          var resume=getResume();
+          var startIdx = resume && (!tourId || resume.id===tourId) ? (resume.index||0) : 0;
+          setResume(null);
+          var res = await runOrchestrationUntilDisplay(steps, startIdx, tourId);
+          if (res && res.navigated) { console.log('[Tour Guide Admin] Navigated during orchestration'); return; }
+          indexToStart = Math.min(res.index||0, steps.length-1);
+        } else {
+          // Pas d’orchestration: on démarre en natif immédiatement
+          indexToStart = 0;
+        }
+        if (typeof driver.setConfig==='function'){
+          try{ driver.setConfig({ showButtons:['previous','next','close'], nextBtnText:'Suivant', prevBtnText:'Précédent', closeBtnText:'Fermer', doneBtnText:'Terminer' }); }catch(_){ }
+        }
+        if (typeof driver.defineSteps==='function' && typeof driver.start==='function'){
+          var mappedLegacy = mapStepsForDriver(steps||[]);
+          driver.defineSteps(mappedLegacy);
+          driver.start(indexToStart);
+          console.log('[TG Admin] Tour démarré (ancienne API)');
+          ensureFooterButtons(driver);
+          ensurePopoverVisibleFallback(driver, steps, indexToStart);
+        } else if (typeof driver.setSteps==='function' && typeof driver.drive==='function'){
+          driver.setSteps(mapStepsForDriver(steps||[]));
+          if (typeof driver.drive==='function'){ driver.drive({ stepIndex:indexToStart }); } else { driver.drive(); }
+          console.log('[TG Admin] Tour démarré (nouvelle API)');
+          ensureFooterButtons(driver);
+          ensurePopoverVisibleFallback(driver, steps, indexToStart);
+        } else {
+          console.warn('[Tour Guide Admin] API Driver inconnue');
+        }
+      }catch(e){ console.error('[Tour Guide Admin] Orchestrator error', e); }
+    })();
+  }
+
+  // Fallback robuste: injecter boutons et observer les changements de la popover
+  function ensureFooterButtons(driver){
+    function goNext(){
+      if (!driver) return;
+      if (typeof driver.moveNext === 'function') return driver.moveNext();
+      if (typeof driver.next === 'function') return driver.next();
+    }
+    function goPrev(){
+      if (!driver) return;
+      if (typeof driver.movePrevious === 'function') return driver.movePrevious();
+      if (typeof driver.prev === 'function') return driver.prev();
+    }
+    function inject(){
+      var footer = document.querySelector('.driver-popover-footer');
+      if (!footer) return;
+      
+      // Chercher les boutons existants (natifs Driver.js ou nos boutons)
+      var prevBtn = footer.querySelector('.driver-prev-btn, .driver-popover-prev-btn, [data-tg-prev]');
+      var nextBtn = footer.querySelector('.driver-next-btn, .driver-popover-next-btn, [data-tg-next]');
+      
+      // Si le bouton précédent existe mais est vide/mal configuré
+      if (prevBtn && !prevBtn.textContent.trim()) {
+        prevBtn.textContent = 'Précédent';
+        prevBtn.setAttribute('data-tg-prev', '1');
+        if (!prevBtn.onclick && !prevBtn.getAttribute('data-tg-click')) {
+          prevBtn.addEventListener('click', function(e){ e.preventDefault(); goPrev(); });
+          prevBtn.setAttribute('data-tg-click', '1');
+        }
+      } else if (!prevBtn) {
+        prevBtn = document.createElement('button');
+        prevBtn.type='button';
+        prevBtn.className='driver-prev-btn driver-popover-prev-btn button';
+        prevBtn.textContent='Précédent';
+        prevBtn.setAttribute('data-tg-prev','1');
+        prevBtn.addEventListener('click', function(e){ e.preventDefault(); goPrev(); });
+        footer.insertBefore(prevBtn, footer.firstChild);
+      }
+      
+      // Si le bouton suivant existe mais est vide/mal configuré
+      if (nextBtn && !nextBtn.textContent.trim()) {
+        nextBtn.textContent = 'Suivant';
+        nextBtn.setAttribute('data-tg-next', '1');
+        if (!nextBtn.onclick && !nextBtn.getAttribute('data-tg-click')) {
+          nextBtn.addEventListener('click', function(e){ e.preventDefault(); goNext(); });
+          nextBtn.setAttribute('data-tg-click', '1');
+        }
+      } else if (!nextBtn) {
+        nextBtn = document.createElement('button');
+        nextBtn.type='button';
+        nextBtn.className='driver-next-btn driver-popover-next-btn button button-primary';
+        nextBtn.textContent='Suivant';
+        nextBtn.setAttribute('data-tg-next','1');
+        nextBtn.addEventListener('click', function(e){ e.preventDefault(); goNext(); });
+        footer.appendChild(nextBtn);
+      }
+    }
+    // première injection après ouverture
+    setTimeout(function(){
+      inject();
+      console.log('[TG] Boutons injectés. Footer:', document.querySelector('.driver-popover-footer'));
+    }, 100);
+    // observer pour chaque changement d’étape / re-render du footer
+    try{
+      var observer = new MutationObserver(function(){ 
+        setTimeout(inject, 50); // léger délai pour laisser Driver finir son render
+      });
+      observer.observe(document.body, { subtree: true, childList: true });
+      // arrêter l’observer quand la popover disparaît
+      var stopObs = function(){ observer.disconnect(); document.removeEventListener('driver:destroy', stopObs, true); };
+      document.addEventListener('driver:destroy', stopObs, true);
+    } catch(_) { /* no-op */ }
+  }
+  // Fallback: si aucune popover n'apparaît après le démarrage, tenter un highlight manuel
+  function ensurePopoverVisibleFallback(driver, steps, idx){
+    setTimeout(function(){
+      try{
+        var pop = document.querySelector('.driver-popover');
+        if (pop) return;
+        var s = Array.isArray(steps) ? steps[Math.max(0, idx||0)] : null;
+        if (!s) return;
+        var element = s.element || s.selector || 'body';
+        var title = (s.popover && s.popover.title) || s.title || '';
+        var description = (s.popover && s.popover.description) || s.description || '';
+        var position = (s.popover && s.popover.position) || s.position || 'bottom';
+        if (driver && typeof driver.highlight==='function'){
+          // Laisser description en string, Driver.js gère le HTML nativement
+          driver.highlight({ element: element, popover: { title: title, description: description, position: position } });
+        }
+      }catch(_){ }
+    }, 400);
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    var data = window.TOUR_GUIDE_DATA || {};
+    var tours = Array.isArray(data.tours) ? data.tours : [];
+
+    // DEBUG
+    console.log('[Tour Guide Admin] Tours disponibles:', tours.length);
+
+    // Lier les clics via l'id généré par l'admin bar: #wp-admin-bar-tour_guide_tour_<id>
+    tours.forEach(function(tour){
+      var itemId = 'wp-admin-bar-tour_guide_tour_' + tour.id.replace(/[^a-z0-9_-]/gi, '');
+      var anchor = document.querySelector('#' + itemId + ' > a.ab-item');
+      if (!anchor) {
+        // Fallback: chercher par texte
+        var candidates = document.querySelectorAll('#wp-admin-bar-tour_guide_adminbar .ab-submenu a.ab-item');
+        candidates.forEach(function(a){
+          if (!anchor && a.textContent && a.textContent.trim() === tour.title) { anchor = a; }
+        });
+      }
+      if (anchor) {
+        var handler = function(e){ e.preventDefault(); e.stopPropagation(); startTour(tour.steps, tour.id); };
+        var downHandler = function(e){ e.preventDefault(); e.stopPropagation(); };
+        // Intercepter mousedown pour éviter la fermeture du sous-menu
+        anchor.addEventListener('mousedown', downHandler, true);
+        anchor.addEventListener('click', handler, true);
+      }
+    });
+
+    // Edition de templates: ajout dynamique d’étapes
+    var stepsTable = document.getElementById('tour-guide-steps-table');
+    var addStepBtn = document.getElementById('tour-guide-add-step');
+    if (stepsTable && addStepBtn) {
+      addStepBtn.addEventListener('click', function(){
+        var tbody = stepsTable.querySelector('tbody');
+        if (!tbody) { return; }
+        var rows = tbody.querySelectorAll('tr');
+        if (!rows.length) { return; }
+        var lastRow = rows[rows.length - 1];
+        var newRow = lastRow.cloneNode(true);
+        // Nettoyer les valeurs
+        Array.prototype.forEach.call(newRow.querySelectorAll('input, textarea'), function(el){ el.value = ''; });
+        Array.prototype.forEach.call(newRow.querySelectorAll('select'), function(sel){
+          if (sel.options.length) { sel.selectedIndex = 0; }
+        });
+        // Poignée dans la première cellule
+        var firstCell = newRow.querySelector('td');
+        if (firstCell) {
+          var existingHandle = firstCell.querySelector('.tg-handle');
+          if (!existingHandle){
+            var handle = document.createElement('span');
+            handle.className = 'tg-handle';
+            handle.title = 'Glisser pour réordonner';
+            firstCell.prepend(handle);
+          }
+        }
+        newRow.classList.add('tg-card');
+        tbody.appendChild(newRow);
+        renumberRows(tbody);
+        applyActionVisibilityForRow(newRow);
+      });
+    }
+
+    // Drag & Drop (jQuery UI Sortable si disponible)
+    function addRowControls(tr){
+      if (!tr) return;
+      var toolsTd = tr.querySelector('td.tg-sec-resume') || tr.querySelector('td');
+      if (!toolsTd) return;
+      var controls = toolsTd.querySelector('.tg-row-actions');
+      if (!controls){
+        controls = document.createElement('div');
+        controls.className = 'tg-row-actions';
+        var btnTest = document.createElement('button');
+        btnTest.type = 'button';
+        btnTest.className = 'button button-secondary tg-test';
+        btnTest.textContent = 'Tester';
+        var btnDup = document.createElement('button');
+        btnDup.type = 'button';
+        btnDup.className = 'button button-secondary tg-dup';
+        btnDup.textContent = 'Dupliquer';
+        var btnDel = document.createElement('button');
+        btnDel.type = 'button';
+        btnDel.className = 'button button-link-delete tg-del';
+        btnDel.textContent = 'Supprimer';
+        controls.appendChild(btnTest);
+        controls.appendChild(btnDup);
+        controls.appendChild(btnDel);
+        toolsTd.appendChild(controls);
+      }
+    }
+
+    function renumberRows(tbody){
+      var trs = tbody.querySelectorAll('tr');
+      trs.forEach(function(tr, i){
+        tr.classList.add('tg-card');
+        var td = tr.querySelector('td.tg-sec-number') || tr.querySelector('td');
+        if (!td) return;
+        // s’assurer de la poignée
+        var handle = td.querySelector('.tg-handle');
+        if (!handle){
+          handle = document.createElement('span');
+          handle.className = 'tg-handle';
+          handle.title = 'Glisser pour réordonner';
+          td.prepend(handle);
+        }
+        addRowControls(tr);
+      });
+    }
+    (function initSortable(){
+      var $ = window.jQuery;
+      var tbody = document.querySelector('#tour-guide-steps-table tbody');
+      if (!tbody) return;
+      // Ajouter poignées initiales
+      renumberRows(tbody);
+      if ($ && $.fn && $.fn.sortable){
+        var $tbody = $(tbody);
+        $tbody.sortable({
+          handle: '.tg-handle',
+          items: '> tr',
+          axis: 'y',
+          helper: function(e, ui){
+            ui.children().each(function(){ $(this).width($(this).width()); });
+            return ui;
+          },
+          placeholder: 'tg-sort-placeholder',
+          forcePlaceholderSize: true,
+          stop: function(){ renumberRows(tbody); }
+        });
+      } else {
+        // Fallback minimal: pas de lib dispo, laisser tel quel
+        console.warn('[Tour Guide Admin] jQuery UI Sortable non disponible');
+      }
+    })();
+
+    // Délégation pour Dupliquer/Supprimer
+    document.addEventListener('click', function(e){
+      var btn;
+      // Tester
+      btn = e.target.closest && e.target.closest('.tg-test');
+      if (btn){
+        e.preventDefault();
+        var tr = btn.closest('tr');
+        if (tr){
+          var selector = (tr.querySelector('input[name="step_selector[]"]')||{}).value || 'body';
+          var title = (tr.querySelector('input[name="step_title[]"]')||{}).value || 'Test';
+          var desc = (tr.querySelector('textarea[name="step_description[]"]')||{}).value || '';
+          var pos = (tr.querySelector('select[name="step_position[]"]')||{}).value || 'bottom';
+          var driver = createDriverInstance({ allowClose:true, animate:true, opacity:0.2, showButtons:['close'], closeBtnText:'Fermer' });
+          function toHtmlNode(str){ var d=document.createElement('div'); d.innerHTML=str||''; return d; }
+          if (driver && typeof driver.highlight==='function'){
+            driver.highlight({ element: selector, popover: { title: title, description: toHtmlNode(desc), position: pos } });
+          }
+        }
+        return;
+      }
+      // Supprimer
+      btn = e.target.closest && e.target.closest('.tg-del');
+      if (btn){
+        e.preventDefault();
+        var tr = btn.closest('tr');
+        if (tr){
+          var tbody = tr.parentElement;
+          tr.remove();
+          renumberRows(tbody);
+        }
+        return;
+      }
+      // Dupliquer
+      btn = e.target.closest && e.target.closest('.tg-dup');
+      if (btn){
+        e.preventDefault();
+        var tr = btn.closest('tr');
+        if (tr){
+          var clone = tr.cloneNode(true);
+          // Nettoyer valeurs des inputs texte/textarea ? ici on conserve la config en cas de duplication
+          tr.parentElement.insertBefore(clone, tr.nextSibling);
+          renumberRows(tr.parentElement);
+          applyActionVisibilityForRow(clone);
+        }
+        return;
+      }
+    });
+
+    // Optional: expose in console
+    window.tourGuideStart = function(tourIdOrSteps){ 
+      if (typeof tourIdOrSteps === 'string') {
+        var tour = tours.find(function(t){ return t.id === tourIdOrSteps; });
+        if (tour) { startTour(tour.steps, tour.id); } else { console.warn('[Tour Guide Admin] Tour introuvable pour id:', tourIdOrSteps); }
+      } else if (Array.isArray(tourIdOrSteps)) {
+        startTour(tourIdOrSteps, null);
+      } else {
+        console.warn('[Tour Guide Admin] Paramètre inattendu pour tourGuideStart');
+      }
+    };
+    window.tourGuideStartIndex = function(tourId, idx){
+      var tour = tours.find(function(t){ return t.id === tourId; });
+      if (!tour) { console.warn('[Tour Guide Admin] Tour introuvable pour id:', tourId); return; }
+      // Simuler une reprise pour tester un index
+      setResume({ id: tourId, index: idx||0 });
+      startTour(tour.steps, tourId);
+    };
+  });
+})();

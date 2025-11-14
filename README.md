@@ -12,7 +12,8 @@ Les visites sont définies via des templates XML activables/désactivables depui
 5. Côté front, ajouter `?tour=1` à l’URL pour lancer une visite globale.
 
 ## Changelog
-- 2025-11-14 · v0.1.4.0 · Refonte UI éditeur de templates: layout en cartes ultra-compact, drag & drop par poignée, actions par étape (Tester/Dupliquer/Supprimer), masquage dynamique des champs d’action, sections "Action" et "Attendre" en lignes combinées, tooltips FR. Corrections admin bar et orchestrateur (attente réduite, fallback highlight), améliorations UX.
+- 2025-11-14 · v0.1.5.0 · Suppression orchestrateur: retour au mode natif Driver.js simple et stable. Menu dropdown custom unifié (plus de double affichage survol/clic), décodage HTML des titres (apostrophes), lien "Gérer les templates" intégré. Navigation Précédent/Suivant native et fonctionnelle.
+- 2025-11-14 · v0.1.4.0 · Refonte UI éditeur de templates: layout en cartes ultra-compact, drag & drop par poignée, actions par étape (Tester/Dupliquer/Supprimer), masquage dynamique des champs d'action, sections "Action" et "Attendre" en lignes combinées, tooltips FR. Corrections admin bar et orchestrateur (attente réduite, fallback highlight), améliorations UX.
 - 2025-11-14 · v0.1.3.0 · Listes de visites par template (admin bar et panneau Gutenberg), lancement individuel, compat Driver.js (ancienne/nouvelle API), passage à un bundle local (assets/lib), libellés FR (Précédent/Suivant/Fermer/Terminer), correctifs de chargement (éditeur/admin/front).
 - 2025-11-14 · v0.1.1.0 · Ajout du contexte (admin/éditeur/front) aux templates, générateur de templates enrichi (formulaire + ajout d’étapes) et corrections Gutenberg.
 - 2025-11-14 · v0.1.0 · Création du plugin, intégration Driver.js, templates XML, panneau Gutenberg et barre d’admin.
