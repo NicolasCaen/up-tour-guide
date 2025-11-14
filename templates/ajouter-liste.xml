@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template id="ajouter-liste" title="Ajouter une liste" context="editor">
+  <steps>
+    <step selector=".edit-post-header-toolbar__inserter-toggle, button[aria-label='Ajouter un bloc']" position="bottom">
+      <title>Ouvrir l’inserteur</title>
+      <description>Cliquez pour ouvrir le panneau d’ajout de blocs.</description>
+    </step>
+    <step selector=".block-editor-inserter__search input[type='search']" position="right">
+      <title>Rechercher le bloc Liste</title>
+      <description>Tapez « Liste » pour filtrer la liste des blocs.</description>
+    </step>
+    <step selector="button[aria-label='Liste'], .block-editor-block-types-list__item[aria-label='Liste']" position="right">
+      <title>Insérer une liste</title>
+      <description>Ajoutez un bloc Liste pour créer des puces.</description>
+    </step>
+  </steps>
+</template>

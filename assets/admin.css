@@ -1,0 +1,3 @@
+/* Styles minimalistes pour l’admin du plugin Tour guidé */
+.wrap .widefat td, .wrap .widefat th { vertical-align: middle; }
+#wp-admin-bar-tour_guide_adminbar > .ab-item:before { content: "\f177"; top: 2px; }

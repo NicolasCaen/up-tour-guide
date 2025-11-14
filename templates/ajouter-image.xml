@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template id="ajouter-image" title="Ajouter une image" context="editor">
+  <steps>
+    <step selector=".edit-post-header-toolbar__inserter-toggle, button[aria-label='Ajouter un bloc']" position="bottom">
+      <title>Ouvrir l’inserteur</title>
+      <description>Cliquez pour ouvrir le panneau d’ajout de blocs.</description>
+    </step>
+    <step selector=".block-editor-inserter__search input[type='search']" position="right">
+      <title>Rechercher le bloc Image</title>
+      <description>Tapez « Image » pour filtrer la liste des blocs.</description>
+    </step>
+    <step selector="button[aria-label='Image'], .block-editor-block-types-list__item[aria-label='Image']" position="right">
+      <title>Insérer le bloc Image</title>
+      <description>Ajoutez un bloc Image dans votre contenu.</description>
+    </step>
+  </steps>
+</template>

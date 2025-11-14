@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template id="test-admin" title="TEST Admin" context="admin">
+  <step>
+    <selector>#adminmenu</selector>
+    <title>Menu de gauche</title>
+    <description>Ceci est le menu principal de WordPress</description>
+    <position>right</position>
+  </step>
+  <step>
+    <selector>#wpadminbar</selector>
+    <title>Barre d'admin</title>
+    <description>C'est la barre en haut de l'écran</description>
+    <position>bottom</position>
+  </step>
+  <step>
+    <selector>#wpfooter</selector>
+    <title>Pied de page</title>
+    <description>Version de WordPress affichée ici</description>
+    <position>top</position>
+  </step>
+</template>

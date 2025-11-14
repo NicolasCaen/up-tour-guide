@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template id="ajouter-paragraphe" title="Ajouter un paragraphe" context="editor">
+  <steps>
+    <step selector=".edit-post-header-toolbar__inserter-toggle, button[aria-label='Ajouter un bloc']" position="bottom">
+      <title>Ouvrir l’inserteur</title>
+      <description>Cliquez pour ouvrir le panneau d’ajout de blocs.</description>
+    </step>
+    <step selector=".block-editor-inserter__search input[type='search']" position="right">
+      <title>Rechercher le bloc Paragraphe</title>
+      <description>Tapez « Paragraphe » pour filtrer la liste des blocs.</description>
+    </step>
+    <step selector="button[aria-label='Paragraphe'], .block-editor-block-types-list__item[aria-label='Paragraphe']" position="right">
+      <title>Insérer un paragraphe</title>
+      <description>Ajoutez un bloc Paragraphe et commencez à écrire.</description>
+    </step>
+  </steps>
+</template>

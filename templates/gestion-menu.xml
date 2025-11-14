@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template id="gestion-menu" title="Gestion du menu" context="all">
+  <steps>
+    <step selector="#menu-appearance" position="right">
+      <title>ouvrir apparence</title>
+      <description></description>
+    </step>
+  </steps>
+</template>

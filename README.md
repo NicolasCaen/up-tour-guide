@@ -1,0 +1,16 @@
+# up-tour-guidé
+
+## Description
+Plugin WordPress permettant de créer des visites guidées (back-office, éditeur Gutenberg et front) en s’appuyant sur Driver.js.
+Les visites sont définies via des templates XML activables/désactivables depuis l’administration.
+
+## Installation
+1. Copier le dossier `up-tour-guide` dans `wp-content/plugins/`.
+2. Activer le plugin « Tour guidé » dans l’administration WordPress.
+3. Aller dans le menu « Visites guidées » pour activer les templates existants ou en importer de nouveaux (XML).
+4. Dans l’éditeur Gutenberg, ouvrir le panneau « Visite guidée » pour lancer une visite.
+5. Côté front, ajouter `?tour=1` à l’URL pour lancer une visite globale.
+
+## Changelog
+- 2025-11-14 · v0.1.1.0 · Ajout du contexte (admin/éditeur/front) aux templates, générateur de templates enrichi (formulaire + ajout d’étapes) et corrections Gutenberg.
+- 2025-11-14 · v0.1.0 · Création du plugin, intégration Driver.js, templates XML, panneau Gutenberg et barre d’admin.
