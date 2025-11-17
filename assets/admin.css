@@ -196,3 +196,48 @@
   outline: none;
   box-shadow: inset 0 0 0 2px #2271b1;
 }
+
+/* Garder les sous-menus du menu latéral ouverts tant qu'un tour est actif
+   - Driver.js ajoute la classe driver-active sur le body/html pendant le tour
+   - Nous marquons les menus ouverts par le tour avec .tg-opened
+   => Forcer l'affichage du sous-menu correspondant, même si WordPress
+      essaie de le refermer au survol/sortie de souris. */
+body.driver-active #adminmenu li.wp-has-submenu.tg-opened > .wp-submenu,
+html.driver-active #adminmenu li.wp-has-submenu.tg-opened > .wp-submenu {
+  display: block !important;
+  visibility: visible;
+}
+.driver-popover{
+  max-width:400px;
+}
+
+.driver-popover-title{
+  position:relative;
+  padding-right:24px;
+}
+
+.tg-close-cross{
+  position:absolute;
+  top:6px;
+  right:8px;
+  border:0;
+  background:transparent;
+  color:#50575e;
+  font-size:16px;
+  line-height:1;
+  cursor:pointer;
+}
+.tg-close-cross:hover{
+  color:#000;
+}
+
+textarea[name^="step_"]{
+  min-height:15ch;
+}
+
+.driver-popover-close-btn{
+  display:inline-flex !important;
+  position:absolute !important;
+  top:6px !important;
+  right:-11px !important;
+}

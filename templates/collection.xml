@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template id="Creation modification de Collections" title="Gestion des Collections" context="admin">
+  <steps>
+    <step selector="#menu-posts-collection" position="right">
+      <title>Créer/ modifier Collections</title>
+      <description><![CDATA[<p>Modification et ajout de collections</p>]]></description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="#menu-posts-collection .wp-first-item [href=&quot;edit.php?post_type=collection&quot;]" position="right">
+      <title>Liste des collections</title>
+      <description><![CDATA[<p>Afficher la liste de toutes les collections existantes.</p>]]></description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="#menu-posts-collection [href=&quot;post-new.php?post_type=collection&quot;]" position="right">
+      <title>Ajouter une collection</title>
+      <description><![CDATA[<p>Créer une nouvelle collection.</p>]]></description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="#menu-posts-collection [href=&quot;post-new.php?post_type=collection&quot;]" position="right">
+      <title>Ordonner les collections</title>
+      <description><![CDATA[<p>Le collection peuvent être ordonner par glisser/déposer. L'ordre dans l'administration sera identique à celui du site.</p>
+<video controls width="350">
+<source src="/wp-content/plugins/up-tour-guide/assets/media/post-order.webm" type="video/webm" />
+</video>]]></description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="#menu-posts-collection [href=&quot;edit-tags.php?taxonomy=couleurs&amp;post_type=collection&quot;]" position="right">
+      <title>Gestion des filtres</title>
+      <description><![CDATA[<p>Gérer les filtres associés aux collections.</p>
+<p>Dans les sous-menus suivant, il est possible de renommer,  supprimer ou ajouter des "Termes" pour les différents filtres.</p>
+<p>Si le terme d'un filtre est associé à aucune collection alors il ne sera pas visible sur le site.</p>]]></description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="#menu-posts-collection [href=&quot;edit-tags.php?taxonomy=couleurs&amp;post_type=collection&quot;]" position="right">
+      <title>Ordonner les filtres</title>
+      <description><![CDATA[<p>Il est possible d'ordonner les différents filtres ( Couleurs, Effets, Dimensions, Epaisseurs). l'ordre dans l'administration correspond à celui des filtres sur votre site.</p>
+<video controls width="350">
+<source src="/wp-content/plugins/up-tour-guide/assets/media/tax-order.webm" type="video/webm" />
+</video>]]></description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="#menu-posts-collection [href=&quot;edit-tags.php?taxonomy=categorie&amp;post_type=collection&quot;]" position="right">
+      <title>Catégories</title>
+      <description><![CDATA[<p>Gérer les catégories de collections.</p>]]></description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="#menu-posts-collection [href=&quot;edit-tags.php?taxonomy=labels&amp;post_type=collection&quot;]" position="right">
+      <title>Labels</title>
+      <description><![CDATA[<p>Gérer les labels associés aux collections.</p>
+<p>Cela permet de mettre un label dans le listing des collections pour faire ressortir un produit.</p>
+<p>Par exemple  <strong>"Nouveauté"</strong></p>]]></description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+  </steps>
+</template>

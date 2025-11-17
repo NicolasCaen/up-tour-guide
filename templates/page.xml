@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template id="Creation modification de Contenus" title="Gestion des pages" context="admin">
+  <steps>
+    <step selector="#menu-pages" position="right">
+      <title>Créer/ modifier Pages</title>
+      <description>&lt;p&gt;Modification et ajout de pages&lt;/p&gt;</description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="#menu-pages .wp-first-item [href=&quot;edit.php?post_type=page&quot;]" position="right">
+      <title>Liste des pages</title>
+      <description>&lt;p&gt;Afficher la liste de toutes les pages existantes.&lt;/p&gt;</description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="#menu-pages [href=&quot;post-new.php?post_type=page&quot;]" position="right">
+      <title>Ajouter une page</title>
+      <description>&lt;p&gt;Créer une nouvelle page.&lt;/p&gt;</description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+  </steps>
+</template>

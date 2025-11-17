@@ -19,6 +19,50 @@
     }catch(e){ console.warn('[TG] Erreur fermeture menus', e); }
   }
 
+  function formatDescriptionForPreview(desc){
+    if (!desc) return '';
+    var lines = String(desc).split(/\r\n|\r|\n/);
+    var paras = [];
+    lines.forEach(function(line){
+      if (!line) return;
+      line = line.trim();
+      if (!line) return;
+      if (line.charAt(0) === '<'){
+        // Ligne HTML (ex. <video>…), ne pas l’envelopper dans un <p>.
+        paras.push(line);
+      } else {
+        // Ligne texte (éventuellement avec HTML inline comme <strong>).
+        paras.push('<p>' + line + '</p>');
+      }
+    });
+    return paras.join('\n');
+  }
+
+  function ensurePopoverCloseCross(driver){
+    if (!driver) return;
+    try{
+      var pop = document.querySelector('.driver-popover');
+      if (!pop) return;
+      var container = pop.querySelector('.driver-popover-title') || pop;
+      if (container.querySelector('.tg-close-cross')) return;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'tg-close-cross';
+      btn.innerHTML = '\u00d7';
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        try{
+          if (typeof driver.destroy === 'function'){
+            driver.destroy();
+          } else if (typeof driver.reset === 'function'){
+            driver.reset();
+          }
+        }catch(_){}
+      });
+      container.appendChild(btn);
+    }catch(_){}
+  }
+
   // Ouvrir le sous-menu pour une étape spécifique
   // Utilise de préférence l'élément DOM fourni par Driver.js (argument element des hooks)
   function openMenuForStep(step, element){
@@ -89,10 +133,10 @@
 
     var hooks = {
       onHighlightStarted: function(element, step, options){
-        // À chaque étape, fermer les anciens menus et ouvrir celui qui correspond à l’élément ciblé
         try {
           closeAllTourMenus();
           openMenuForStep(step || null, element || null);
+          ensurePopoverCloseCross(driver);
         } catch(e){
           console.warn('[TG] Erreur onHighlightStarted:', e);
         }
@@ -448,7 +492,8 @@
         if (tr){
           var selector = (tr.querySelector('input[name="step_selector[]"]')||{}).value || 'body';
           var title = (tr.querySelector('input[name="step_title[]"]')||{}).value || 'Test';
-          var desc = (tr.querySelector('textarea[name="step_description[]"]')||{}).value || '';
+          var rawDesc = (tr.querySelector('textarea[name="step_description[]"]')||{}).value || '';
+          var desc = formatDescriptionForPreview(rawDesc);
           var pos = (tr.querySelector('select[name="step_position[]"]')||{}).value || 'bottom';
           
           // Fermer les menus précédents et ouvrir celui de cette étape
@@ -468,6 +513,7 @@
           });
           if (driver && typeof driver.highlight==='function'){
             driver.highlight({ element: selector, popover: { title: title, description: desc, position: pos } });
+            setTimeout(function(){ ensurePopoverCloseCross(driver); }, 0);
           }
         }
         return;

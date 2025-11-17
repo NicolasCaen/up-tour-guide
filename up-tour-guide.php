@@ -2,7 +2,7 @@
 /**
  * Plugin Name: up-Tour guidé
  * Description: Visites guidées pour WordPress (Gutenberg et interface d’admin) avec Driver.js, gestion de templates XML activables.
- * Version: 0.1.6.0
+ * Version: 0.1.7.0
  * Author: GEHIN Nicolas
  * Text Domain: tour-guide
  * Domain Path: /languages
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'TOUR_GUIDE_VERSION', '0.1.6.0' );
+define( 'TOUR_GUIDE_VERSION', '0.1.7.0' );
 define( 'TOUR_GUIDE_FILE', __FILE__ );
 define( 'TOUR_GUIDE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TOUR_GUIDE_URL', plugin_dir_url( __FILE__ ) );
@@ -409,10 +409,35 @@ function tour_guide_load_template_for_edit( $internal_id ) {
             $steps = array();
             foreach ( $steps_raw as $s ) {
                 $orch = isset( $s['orchestrate'] ) && is_array( $s['orchestrate'] ) ? $s['orchestrate'] : array();
+
+                $desc_raw = isset( $s['popover']['description'] ) ? $s['popover']['description'] : '';
+                $desc_for_form = $desc_raw;
+                if ( '' !== $desc_for_form ) {
+                    $tmp = trim( $desc_for_form );
+                    // Supprimer systématiquement les balises <p> pour l’affichage dans le textarea.
+                    $without_p = preg_replace( '#</?p>\s*#i', "\n", $tmp );
+                    $lines = preg_split( "/\r\n|\r|\n/", $without_p );
+                    if ( $lines && is_array( $lines ) ) {
+                        $clean_lines = array();
+                        foreach ( $lines as $line ) {
+                            $line = trim( $line );
+                            if ( '' === $line ) {
+                                continue;
+                            }
+                            $clean_lines[] = $line;
+                        }
+                        if ( ! empty( $clean_lines ) ) {
+                            $desc_for_form = implode( "\n", $clean_lines );
+                        } else {
+                            $desc_for_form = '';
+                        }
+                    }
+                }
+
                 $steps[] = array(
                     'selector'        => isset( $s['element'] ) ? $s['element'] : '',
                     'title'           => isset( $s['popover']['title'] ) ? $s['popover']['title'] : '',
-                    'description'     => isset( $s['popover']['description'] ) ? $s['popover']['description'] : '',
+                    'description'     => $desc_for_form,
                     'position'        => isset( $s['popover']['position'] ) ? $s['popover']['position'] : 'bottom',
                     // Orchestration
                     'action'          => isset( $orch['action'] ) ? $orch['action'] : 'none',
@@ -485,6 +510,31 @@ function tour_guide_handle_save_template_post() {
         $st   = isset( $titles[ $i ] ) ? trim( wp_unslash( $titles[ $i ] ) ) : '';
         $desc = isset( $descriptions[ $i ] ) ? trim( wp_unslash( $descriptions[ $i ] ) ) : '';
         $pos  = isset( $positions[ $i ] ) ? trim( wp_unslash( $positions[ $i ] ) ) : '';
+
+        // Auto-paragrapher les descriptions : chaque ligne de texte devient un <p>…</p>.
+        // Les lignes qui commencent déjà par un tag HTML (ex. <video>) sont laissées telles quelles.
+        if ( '' !== $desc ) {
+            $lines = preg_split( "/\r\n|\r|\n/", $desc );
+            if ( $lines && is_array( $lines ) ) {
+                $paras = array();
+                foreach ( $lines as $line ) {
+                    $line = trim( $line );
+                    if ( '' === $line ) {
+                        continue;
+                    }
+                    if ( 0 === strpos( $line, '<' ) ) {
+                        // Ligne HTML (ex. <video>…), ne pas l’envelopper dans un <p>.
+                        $paras[] = $line;
+                    } else {
+                        // Ligne texte (éventuellement avec HTML inline comme <strong>).
+                        $paras[] = '<p>' . $line . '</p>';
+                    }
+                }
+                if ( ! empty( $paras ) ) {
+                    $desc = implode( "\n", $paras );
+                }
+            }
+        }
         if ( '' === $sel && '' === $st && '' === $desc ) {
             continue; // ignorer les lignes vides
         }
@@ -578,7 +628,7 @@ function tour_guide_build_template_xml( $attr_id, $title, $steps, $context = 'al
 
         $xml .= '    <step selector="' . esc_attr( $selector ) . '" position="' . esc_attr( $pos ) . '">' . "\n";
         $xml .= '      <title>' . esc_html( $st ) . '</title>' . "\n";
-        $xml .= '      <description>' . esc_html( $desc ) . '</description>' . "\n";
+        $xml .= '      <description><![CDATA[' . $desc . ']]></description>' . "\n";
         if ( $action )        { $xml .= '      <action>' . esc_html( $action ) . '</action>' . "\n"; }
         if ( $action_selector ){ $xml .= '      <action_selector>' . esc_html( $action_selector ) . '</action_selector>' . "\n"; }
         if ( $wait_for )      { $xml .= '      <wait_for>' . esc_html( $wait_for ) . '</wait_for>' . "\n"; }

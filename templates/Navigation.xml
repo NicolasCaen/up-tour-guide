@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template id="Navigation" title="Navigation" context="admin">
+  <steps>
+    <step selector="#menu-appearance" position="top">
+      <title>Gestion des menus</title>
+      <description>&lt;p&gt;Editeur de menu : 
+&lt;a href =&quot;/wp-admin/site-editor.php&quot;&gt;Apparence&lt;/a&gt; &gt; &lt;a href=&quot;/wp-admin/site-editor.php?p=%2Fnavigation&quot;&gt;Navigation&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;
+Modifier le menu principal : &lt;a href =&quot;/wp-admin/site-editor.php?p=%2Fwp_navigation%2F8&quot;&gt;Modifier&lt;/a&gt;
+&lt;/p&gt;</description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+  </steps>
+</template>
