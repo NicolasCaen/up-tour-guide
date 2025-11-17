@@ -319,14 +319,16 @@
       
       function renderItems(dd){
         dd.innerHTML = '';
-        if (!tours.length){
+        // Filtrer uniquement les visites avec status === 'menu'
+        var menuTours = tours.filter(function(t){ return t.status === 'menu'; });
+        if (!menuTours.length){
           var empty = document.createElement('div');
           empty.textContent = 'Aucune visite disponible';
           empty.style.padding = '10px 12px';
           empty.style.color = '#a7aaad';
           dd.appendChild(empty);
         } else {
-          tours.forEach(function(t){
+          menuTours.forEach(function(t){
             var a = document.createElement('a');
             a.href = '#';
             a.style.display = 'block';

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: up-Tour guidé
  * Description: Visites guidées pour WordPress (Gutenberg et interface d’admin) avec Driver.js, gestion de templates XML activables.
- * Version: 0.1.7.0
+ * Version: 0.1.8.0
  * Author: GEHIN Nicolas
  * Text Domain: tour-guide
  * Domain Path: /languages
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'TOUR_GUIDE_VERSION', '0.1.7.0' );
+define( 'TOUR_GUIDE_VERSION', '0.1.8.0' );
 define( 'TOUR_GUIDE_FILE', __FILE__ );
 define( 'TOUR_GUIDE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TOUR_GUIDE_URL', plugin_dir_url( __FILE__ ) );
@@ -138,9 +138,16 @@ function tour_guide_render_templates_page() {
 
     // Gestion des actions: activation, upload, création/édition
     if ( isset( $_POST['tour_guide_action'] ) && check_admin_referer( 'tour_guide_templates' ) ) {
-        if ( $_POST['tour_guide_action'] === 'save_activation' && isset( $_POST['templates'] ) && is_array( $_POST['templates'] ) ) {
-            $active = array_map( 'sanitize_text_field', $_POST['templates'] );
-            update_option( 'tour_guide_active_templates', array_values( $active ) );
+        if ( $_POST['tour_guide_action'] === 'save_activation' && isset( $_POST['template_status'] ) && is_array( $_POST['template_status'] ) ) {
+            $status_map = array();
+            foreach ( $_POST['template_status'] as $id => $status ) {
+                $clean_id = sanitize_text_field( $id );
+                $clean_status = sanitize_key( $status );
+                if ( in_array( $clean_status, array( 'menu', 'url_only' ), true ) ) {
+                    $status_map[ $clean_id ] = $clean_status;
+                }
+            }
+            update_option( 'tour_guide_active_templates', $status_map );
             echo '<div class="updated"><p>' . esc_html__( 'Templates mis à jour.', 'tour-guide' ) . '</p></div>';
         }
         if ( $_POST['tour_guide_action'] === 'upload' && ! empty( $_FILES['template_xml']['name'] ) ) {
@@ -356,13 +363,14 @@ function tour_guide_render_templates_page() {
         <hr />
 
         <h2><?php echo esc_html__( 'Visites disponibles', 'tour-guide' ); ?></h2>
+        <p class="description"><?php echo esc_html__( 'Configurez la disponibilité de chaque visite : dans le menu et/ou accessible par URL directe.', 'tour-guide' ); ?></p>
         <form method="post">
             <?php wp_nonce_field( 'tour_guide_templates' ); ?>
             <input type="hidden" name="tour_guide_action" value="save_activation" />
-            <table id="tour-guide-templates-activation" class="widefat fixed" style="max-width: 800px;">
+            <table id="tour-guide-templates-activation" class="widefat fixed" style="max-width: 900px;">
                 <thead>
                     <tr>
-                        <th><?php echo esc_html__( 'Actif', 'tour-guide' ); ?></th>
+                        <th><?php echo esc_html__( 'Disponibilité', 'tour-guide' ); ?></th>
                         <th><?php echo esc_html__( 'Fichier', 'tour-guide' ); ?></th>
                         <th><?php echo esc_html__( 'Titre', 'tour-guide' ); ?></th>
                         <th><?php echo esc_html__( 'Origine', 'tour-guide' ); ?></th>
@@ -370,10 +378,17 @@ function tour_guide_render_templates_page() {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ( $all as $tpl ) : ?>
+                    <?php
+                    foreach ( $all as $tpl ) :
+                        $current_status = isset( $active[ $tpl['id'] ] ) ? $active[ $tpl['id'] ] : 'disabled';
+                    ?>
                         <tr>
                             <td>
-                                <input type="checkbox" name="templates[]" value="<?php echo esc_attr( $tpl['id'] ); ?>" <?php checked( in_array( $tpl['id'], $active, true ) ); ?> />
+                                <select name="template_status[<?php echo esc_attr( $tpl['id'] ); ?>]" style="width: 100%;">
+                                    <option value="disabled" <?php selected( $current_status, 'disabled' ); ?>><?php echo esc_html__( 'Désactivé', 'tour-guide' ); ?></option>
+                                    <option value="menu" <?php selected( $current_status, 'menu' ); ?>><?php echo esc_html__( 'Menu + URL', 'tour-guide' ); ?></option>
+                                    <option value="url_only" <?php selected( $current_status, 'url_only' ); ?>><?php echo esc_html__( 'URL uniquement', 'tour-guide' ); ?></option>
+                                </select>
                             </td>
                             <td><?php echo esc_html( $tpl['file'] ); ?></td>
                             <td><?php echo esc_html( $tpl['title'] ); ?></td>
@@ -646,9 +661,18 @@ function tour_guide_build_template_xml( $attr_id, $title, $steps, $context = 'al
 }
 
 // Utilitaires: lister les templates XML et les actifs
+// Retourne un tableau associatif ID => statut ('menu' ou 'url_only')
 function tour_guide_get_active_templates() {
     $active = get_option( 'tour_guide_active_templates', array() );
     if ( ! is_array( $active ) ) { $active = array(); }
+    // Support ancien format (simple liste d'IDs) pour migration
+    if ( ! empty( $active ) && isset( $active[0] ) && is_string( $active[0] ) ) {
+        $legacy = $active;
+        $active = array();
+        foreach ( $legacy as $id ) {
+            $active[ $id ] = 'menu';
+        }
+    }
     return $active;
 }
 
@@ -722,12 +746,13 @@ function tour_guide_get_tours_by_template( $active_only = true, $context_filter 
     }
 
     if ( $active_only ) {
-        // Parcourir dans l'ordre d'activation
-        foreach ( $active as $id ) {
+        // Parcourir dans l'ordre d'activation (clés du tableau $active)
+        foreach ( array_keys( $active ) as $id ) {
             if ( ! isset( $by_id[ $id ] ) ) {
                 continue;
             }
             $tpl = $by_id[ $id ];
+            $tpl['status'] = isset( $active[ $id ] ) ? $active[ $id ] : 'menu';
 
             $tpl_context = isset( $tpl['context'] ) ? $tpl['context'] : 'all';
             if ( $context_filter && 'all' !== $context_filter ) {
@@ -743,6 +768,7 @@ function tour_guide_get_tours_by_template( $active_only = true, $context_filter 
                     'xml_id' => isset( $tpl['attr_id'] ) ? $tpl['attr_id'] : '',
                     'title'  => $tpl['title'],
                     'steps'  => $tpl_steps,
+                    'status' => isset( $tpl['status'] ) ? $tpl['status'] : 'menu',
                 );
             }
         }
@@ -762,6 +788,7 @@ function tour_guide_get_tours_by_template( $active_only = true, $context_filter 
                     'xml_id' => isset( $tpl['attr_id'] ) ? $tpl['attr_id'] : '',
                     'title'  => $tpl['title'],
                     'steps'  => $tpl_steps,
+                    'status' => 'menu', // Par défaut pour les non actifs
                 );
             }
         }
