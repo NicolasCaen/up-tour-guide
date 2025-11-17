@@ -249,6 +249,36 @@
     var tours = Array.isArray(data.tours) ? data.tours : [];
     console.log('[Tour Guide Admin] Tours disponibles:', tours.length);
 
+    // Démarrage automatique via paramètres d’URL
+    try {
+      var search      = new URLSearchParams(window.location.search || '');
+      var tourParam   = search.get('tour');
+      var visiteParam = search.get('visite');
+
+      if (tourParam) {
+        if (tourParam === '1' && tours.length > 0) {
+          // Lancer le premier tour disponible
+          startTour(tours[0].steps, tours[0].id);
+        } else {
+          // Chercher par ID interne
+          var tourByInternal = tours.find(function(t){ return t.id === tourParam; });
+          if (tourByInternal) {
+            startTour(tourByInternal.steps, tourByInternal.id);
+          }
+        }
+      } else if (visiteParam) {
+        // Chercher par ID de template XML (xml_id)
+        var tourByXmlId = tours.find(function(t){
+          return t.xml_id && String(t.xml_id) === String(visiteParam);
+        });
+        if (tourByXmlId) {
+          startTour(tourByXmlId.steps, tourByXmlId.id);
+        }
+      }
+    } catch(e) {
+      console.warn('[Tour Guide Admin] Erreur lecture paramètres URL pour démarrage auto', e);
+    }
+
     // Menu dropdown custom
     (function(){
       var mainBtn = document.querySelector('#wp-admin-bar-tour_guide_adminbar > a.ab-item');
@@ -480,6 +510,25 @@
       } else {
         console.warn('[Tour Guide Admin] jQuery UI Sortable non disponible');
       }
+    })();
+
+    (function initActivationSortable(){
+      var $ = window.jQuery;
+      var table = document.getElementById('tour-guide-templates-activation');
+      if (!table || !$ || !$.fn || !$.fn.sortable) return;
+      var tbody = table.querySelector('tbody');
+      if (!tbody) return;
+      var $tbody = $(tbody);
+      $tbody.sortable({
+        items: '> tr',
+        axis: 'y',
+        helper: function(e, ui){
+          ui.children().each(function(){ $(this).width($(this).width()); });
+          return ui;
+        },
+        placeholder: 'tg-sort-placeholder',
+        forcePlaceholderSize: true
+      });
     })();
 
     // Délégation pour Dupliquer/Supprimer/Tester

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<template id="demarage" title="Démarage" context="admin">
+<template id="demarrage" title="Démarrage" context="admin">
   <steps>
     <step selector="#menu-appearance" position="top">
       <title>Modification du menu</title>
-      <description>On sélectionne le menu à modifier
+      <description>Sélectionnez le menu à modifier
 &lt;p&gt;Gérer les menus : 
 &lt;a href =&quot;/wp-admin/site-editor.php&quot;&gt;Apparence&lt;/a&gt; &gt; &lt;a href=&quot;/wp-admin/site-editor.php?p=%2Fnavigation&quot;&gt;Navigation&lt;/a&gt;
 &lt;/p&gt;
@@ -32,7 +32,7 @@
       <resume>none</resume>
     </step>
     <step selector="#menu-posts-collection [href=&quot;edit-tags.php?taxonomy=categorie&amp;post_type=collection&quot;]" position="top">
-      <title>Catégorie de Collection</title>
+      <title>Catégories de collections</title>
       <description></description>
       <action>none</action>
       <wait_timeout>0</wait_timeout>

@@ -190,7 +190,8 @@ function tour_guide_render_templates_page() {
                     <th scope="row"><label for="template_attr_id"><?php echo esc_html__( 'ID du template', 'tour-guide' ); ?></label></th>
                     <td>
                         <input name="template_attr_id" id="template_attr_id" type="text" class="regular-text" value="<?php echo $editing_template ? esc_attr( $editing_template['attr_id'] ) : ''; ?>" />
-                        <p class="description"><?php echo esc_html__( 'Utilisé dans l’attribut id="" du template XML.', 'tour-guide' ); ?></p>
+
+                        <p class="description"><?php echo esc_html__( 'Utilisé dans l’attribut id="" du template XML. Peut aussi servir à lancer une visite via l’URL, par exemple ?visite=mon-id.', 'tour-guide' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -354,11 +355,11 @@ function tour_guide_render_templates_page() {
 
         <hr />
 
-        <h2><?php echo esc_html__( 'Activer / Désactiver', 'tour-guide' ); ?></h2>
+        <h2><?php echo esc_html__( 'Visites disponibles', 'tour-guide' ); ?></h2>
         <form method="post">
             <?php wp_nonce_field( 'tour_guide_templates' ); ?>
             <input type="hidden" name="tour_guide_action" value="save_activation" />
-            <table class="widefat fixed" style="max-width: 800px;">
+            <table id="tour-guide-templates-activation" class="widefat fixed" style="max-width: 800px;">
                 <thead>
                     <tr>
                         <th><?php echo esc_html__( 'Actif', 'tour-guide' ); ?></th>
@@ -669,62 +670,100 @@ function tour_guide_list_all_templates() {
             $templates[] = tour_guide_parse_template_meta( $file, 'upload' );
         }
     }
-
     return $templates;
 }
 
 function tour_guide_parse_template_meta( $filepath, $source ) {
-    $title = basename( $filepath );
-    $id = md5( $source . '|' . $title );
-    $context = 'all';
+	$title   = basename( $filepath );
+	$id      = md5( $source . '|' . $title );
+	$context = 'all';
+	$attr_id = '';
 
-    // Essayer d’extraire un titre depuis le XML: <template title="..."> ...
-    $content = @file_get_contents( $filepath );
-    if ( $content ) {
-        // Simple extraction de l’attribut title
-        if ( preg_match( '/<template[^>]*title=\"([^\"]+)\"/i', $content, $m ) ) {
-            $title = wp_strip_all_tags( $m[1] );
-        }
-        // Extraction de l’attribut context éventuel
-        if ( preg_match( '/<template[^>]*context=\"([^\"]+)\"/i', $content, $m2 ) ) {
-            $context = sanitize_key( $m2[1] );
-        }
-    }
+	// Essayer d’extraire un titre depuis le XML: <template id="..." title="..." context="...">
+	$content = @file_get_contents( $filepath );
+	if ( $content ) {
+		// Simple extraction de l’attribut title
+		if ( preg_match( '/<template[^>]*title="([^"]+)"/i', $content, $m ) ) {
+			$title = wp_strip_all_tags( $m[1] );
+		}
+		// Extraction de l’attribut context éventuel
+		if ( preg_match( '/<template[^>]*context="([^"]+)"/i', $content, $m2 ) ) {
+			$context = sanitize_key( $m2[1] );
+		}
+		// Extraction de l’attribut id éventuel
+		if ( preg_match( '/<template[^>]*id="([^"]+)"/i', $content, $m3 ) ) {
+			$attr_id = wp_strip_all_tags( $m3[1] );
+		}
+	}
 
-    return array(
-        'id'     => $id,
-        'file'   => basename( $filepath ),
-        'path'   => $filepath,
-        'title'  => $title,
-        'source' => $source,
-        'context'=> $context,
-    );
+	return array(
+		'id'      => $id,
+		'attr_id' => $attr_id,
+		'file'    => basename( $filepath ),
+		'path'    => $filepath,
+		'title'   => $title,
+		'source'  => $source,
+		'context' => $context,
+	);
 }
 
 // Retourner les templates avec leurs steps (séparés par template)
 function tour_guide_get_tours_by_template( $active_only = true, $context_filter = 'all' ) {
-    $all = tour_guide_list_all_templates();
+    $all    = tour_guide_list_all_templates();
     $active = tour_guide_get_active_templates();
-    $tours = array();
+    $tours  = array();
 
+    // Indexer les templates par ID pour pouvoir respecter l'ordre d'activation
+    $by_id = array();
     foreach ( $all as $tpl ) {
-        if ( $active_only && ! in_array( $tpl['id'], $active, true ) ) {
-            continue;
+        if ( isset( $tpl['id'] ) ) {
+            $by_id[ $tpl['id'] ] = $tpl;
         }
-        // Filtrer par contexte si nécessaire
-        $tpl_context = isset( $tpl['context'] ) ? $tpl['context'] : 'all';
-        if ( $context_filter && 'all' !== $context_filter ) {
-            if ( 'all' !== $tpl_context && $tpl_context !== $context_filter ) {
+    }
+
+    if ( $active_only ) {
+        // Parcourir dans l'ordre d'activation
+        foreach ( $active as $id ) {
+            if ( ! isset( $by_id[ $id ] ) ) {
                 continue;
             }
+            $tpl = $by_id[ $id ];
+
+            $tpl_context = isset( $tpl['context'] ) ? $tpl['context'] : 'all';
+            if ( $context_filter && 'all' !== $context_filter ) {
+                if ( 'all' !== $tpl_context && $tpl_context !== $context_filter ) {
+                    continue;
+                }
+            }
+
+            $tpl_steps = tour_guide_parse_template_steps( $tpl['path'] );
+            if ( ! empty( $tpl_steps ) ) {
+                $tours[] = array(
+                    'id'     => $tpl['id'],
+                    'xml_id' => isset( $tpl['attr_id'] ) ? $tpl['attr_id'] : '',
+                    'title'  => $tpl['title'],
+                    'steps'  => $tpl_steps,
+                );
+            }
         }
-        $tpl_steps = tour_guide_parse_template_steps( $tpl['path'] );
-        if ( ! empty( $tpl_steps ) ) {
-            $tours[] = array(
-                'id'    => $tpl['id'],
-                'title' => $tpl['title'],
-                'steps' => $tpl_steps,
-            );
+    } else {
+        // Mode non filtré : conserver le comportement existant (ordre des fichiers)
+        foreach ( $all as $tpl ) {
+            $tpl_context = isset( $tpl['context'] ) ? $tpl['context'] : 'all';
+            if ( $context_filter && 'all' !== $context_filter ) {
+                if ( 'all' !== $tpl_context && $tpl_context !== $context_filter ) {
+                    continue;
+                }
+            }
+            $tpl_steps = tour_guide_parse_template_steps( $tpl['path'] );
+            if ( ! empty( $tpl_steps ) ) {
+                $tours[] = array(
+                    'id'     => $tpl['id'],
+                    'xml_id' => isset( $tpl['attr_id'] ) ? $tpl['attr_id'] : '',
+                    'title'  => $tpl['title'],
+                    'steps'  => $tpl_steps,
+                );
+            }
         }
     }
 

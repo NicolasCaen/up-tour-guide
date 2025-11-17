@@ -3,7 +3,7 @@
   <steps>
     <step selector="#menu-appearance" position="top">
       <title>Gestion des menus</title>
-      <description>&lt;p&gt;Editeur de menu : 
+      <description>&lt;p&gt;Éditeur de menus : 
 &lt;a href =&quot;/wp-admin/site-editor.php&quot;&gt;Apparence&lt;/a&gt; &gt; &lt;a href=&quot;/wp-admin/site-editor.php?p=%2Fnavigation&quot;&gt;Navigation&lt;/a&gt;
 &lt;/p&gt;
 &lt;p&gt;

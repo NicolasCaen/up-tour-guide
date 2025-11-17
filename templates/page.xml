@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<template id="Creation modification de Contenus" title="Gestion des pages" context="admin">
+<template id="Creation et modification de contenus" title="Gestion des pages" context="admin">
   <steps>
     <step selector="#menu-pages" position="right">
-      <title>Créer/ modifier Pages</title>
+      <title>Créer / modifier des pages</title>
       <description>&lt;p&gt;Modification et ajout de pages&lt;/p&gt;</description>
       <action>none</action>
       <wait_timeout>0</wait_timeout>

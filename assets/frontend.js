@@ -61,17 +61,28 @@
     var data = window.TOUR_GUIDE_FRONT || {};
     var tours = Array.isArray(data.tours) ? data.tours : [];
     
-    // Lancer via query ?tour=1 ou ?tour=tour-id
-    var tourParam = new URLSearchParams(window.location.search).get('tour');
+    // Lancer via query :
+    // - ?tour=1 ou ?tour=ID_INTERNE (ID utilisé côté JS/admin)
+    // - ?visite=ID_TEMPLATE_XML (attribut id="" du template)
+    var search      = new URLSearchParams(window.location.search);
+    var tourParam   = search.get('tour');
+    var visiteParam = search.get('visite');
+
     if (tourParam) {
       if (tourParam === '1' && tours.length > 0) {
         // Lancer le premier tour disponible
         startFrontTour(tours[0].steps);
       } else {
-        // Chercher par ID
-        var tour = tours.find(function(t){ return t.id === tourParam; });
-        if (tour) { startFrontTour(tour.steps); }
+        // Chercher par ID interne
+        var tourByInternal = tours.find(function(t){ return t.id === tourParam; });
+        if (tourByInternal) { startFrontTour(tourByInternal.steps); }
       }
+    } else if (visiteParam) {
+      // Chercher par ID de template XML (xml_id)
+      var tourByXmlId = tours.find(function(t){
+        return t.xml_id && String(t.xml_id) === String(visiteParam);
+      });
+      if (tourByXmlId) { startFrontTour(tourByXmlId.steps); }
     }
     
     // Lier les clics sur l’Admin Bar en front
