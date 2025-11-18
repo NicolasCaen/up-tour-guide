@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template id="ajouter-composition" title="Ajouter une composition" context="editor">
+  <steps>
+    <step selector=".editor-document-tools__inserter-toggle" position="bottom">
+      <title>Ouvrir l'inserteur</title>
+      <description><![CDATA[<p>Cliquez sur "Suivant" pour ouvrir automatiquement le panneau d'insertion.</p>]]></description>
+      <action>click</action>
+      <action_selector>.editor-document-tools__inserter-toggle</action_selector>
+      <wait_for>.block-editor-tabbed-sidebar__tablist</wait_for>
+      <wait_timeout>500</wait_timeout>
+      <delay_ms>500</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector=".block-editor-tabbed-sidebar__tab:nth-child(2)" position="bottom">
+      <title>Onglet Compositions</title>
+      <description><![CDATA[<p>Cliquez sur "Suivant" pour ouvrir l'onglet Compositions.</p>]]></description>
+      <action>click</action>
+      <action_selector>.block-editor-tabbed-sidebar__tab:nth-child(2)</action_selector>
+      <wait_for>.block-editor-inserter__block-patterns-tabs-container</wait_for>
+      <wait_timeout>5000</wait_timeout>
+      <delay_ms>500</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector=".block-editor-inserter__block-patterns-tabs-container" position="right">
+      <title>Panneau des compositions</title>
+      <description><![CDATA[<p>Voici le panneau avec les différentes catégories de compositions disponibles.</p>]]></description>
+      <action>none</action>
+      <wait_for>.block-editor-inserter__block-patterns-tabs-container</wait_for>
+      <wait_timeout>3000</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step> 
+
+  </steps>
+</template>

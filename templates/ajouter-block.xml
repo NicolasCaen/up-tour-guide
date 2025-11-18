@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template id="ajouter-block" title="Ajouter un block" context="editor">
+  <steps>
+    <step selector=".editor-document-tools__inserter-toggle" position="bottom">
+      <title>Ouvrir l&#039;inserteur</title>
+      <description><![CDATA[<p>Cliquez sur "Suivant" pour ouvrir automatiquement le panneau d'insertion de blocs.</p>]]></description>
+      <action>click</action>
+      <action_selector>.editor-document-tools__inserter-toggle</action_selector>
+      <wait_for>.editor-inserter-sidebar</wait_for>
+      <wait_timeout>5000</wait_timeout>
+      <delay_ms>500</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector=".editor-inserter-sidebar" position="right">
+      <title>Panneau d&#039;insertion de blocs</title>
+      <description><![CDATA[<p>Le panneau est maintenant ouvert. Vous pouvez rechercher et ajouter des blocs ici.</p>]]></description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector=".block-editor-inserter__search" position="right">
+      <title>Rechercher le type de block</title>
+      <description><![CDATA[<p>Cliquez dur l'icone du block à insérer.</p>]]></description>
+      <action>none</action>
+      <wait_for>.block-editor-inserter__search</wait_for>
+      <wait_timeout>3000</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector=".editor-block-list-item-image" position="right">
+      <title>Ajouter un block image</title>
+      <description><![CDATA[<p>Cliquez sur l'icône du block image pour l'ajouter.</p>]]></description>
+      <action>none</action>
+      <wait_for>.editor-block-list-item-image</wait_for>
+      <wait_timeout>3000</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector=".editor-block-list-item-gallery" position="right">
+      <title>Ajouter un block gallery</title>
+      <description><![CDATA[<p>Cliquez sur l'icône du block gallery pour l'ajouter.</p>]]></description>
+      <action>none</action>
+      <wait_for>.editor-block-list-item-gallery</wait_for>
+      <wait_timeout>3000</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="[class^=editor-block-list-item-cover]" position="right">
+      <title>Ajouter un block bannière</title>
+      <description><![CDATA[<p>Cliquez sur l'icône du block bannière pour l'ajouter.</p>]]></description>
+      <action>none</action>
+      <wait_for>.editor-block-list-item-cover</wait_for>
+      <wait_timeout>3000</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector=".editor-block-list-item-video" position="right">
+      <title>Ajouter un block video</title>
+      <description><![CDATA[<p>Cliquez sur l'icône du block video pour l'ajouter.</p>]]></description>
+      <action>click</action>
+      <action_selector>.editor-block-list-item-video</action_selector>
+      <wait_for>.editor-block-list-item-video</wait_for>
+      <wait_timeout>3000</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+  </steps>
+</template>

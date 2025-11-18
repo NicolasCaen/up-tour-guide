@@ -40,7 +40,11 @@
     var start = Date.now();
     return new Promise(function(resolve, reject){
       (function poll(){
-        if (document.querySelector(sel)) return resolve(true);
+        var el = document.querySelector(sel);
+        // Vérifier que l'élément existe ET est visible/interactif
+        if (el && el.offsetParent !== null && el.offsetHeight > 0 && el.offsetWidth > 0) {
+          return resolve(true);
+        }
         if (Date.now() - start > t) return reject(new Error('wait_for timeout: '+sel));
         setTimeout(poll, 100);
       })();
@@ -49,22 +53,77 @@
   function delay(ms){ return new Promise(function(r){ setTimeout(r, ms||0); }); }
   function runOrchestrationUntilDisplay(steps, startIndex, tourId){
     var idx = (typeof startIndex === 'number' && startIndex>=0) ? startIndex : 0;
+    console.log('[Tour Guide] runOrchestrationUntilDisplay called with', steps.length, 'steps, startIndex:', idx);
     function getOrch(s){ return (s && s.orchestrate) ? s.orchestrate : {}; }
     return new Promise(async function(resolve){
+      console.log('[Tour Guide] Starting orchestration loop from index', idx);
       for (var i=idx;i<steps.length;i++){
         var s = steps[i];
         var o = getOrch(s);
+        console.log('[Tour Guide] Step', i, '- orchestrate:', o, '- element:', s.element);
         try {
-          // Gérer l'action de clic d'abord
+          // Si resume="none", ne pas faire le clic maintenant (sera fait par onNextClick)
+          // Seulement faire le clic si resume="auto"
+          var shouldClickNow = o.action === 'click' && o.resume === 'auto';
+          
           var actSel = o.action_selector && o.action_selector.trim() ? o.action_selector : s.element;
-          if (o.action === 'click' && actSel){
+          if (shouldClickNow && actSel){
+            // Attendre que l'élément soit visible avant de cliquer
+            try {
+              await waitForSelector(actSel, 3000);
+            } catch(e){
+              console.warn('[Tour Guide] Element to click not found or not visible:', actSel);
+            }
             var el = document.querySelector(actSel);
             if (el){
+              console.log('[Tour Guide] Clicking on:', actSel, el);
               // Si navigation attendue, enregistrer la reprise puis cliquer
               if (o.navigate_to || (el.tagName==='A' && el.href)){
                 setResume({ id: tourId || 'unknown', index: i+1 });
               }
-              el.click();
+              
+              // Pour les boutons React/Gutenberg, déclencher les événements dans l'ordre
+              try {
+                // Focus sur l'élément
+                el.focus();
+                
+                // Déclencher mousedown, puis mouseup, puis click avec des délais
+                var mouseDownEvent = new MouseEvent('mousedown', { 
+                  bubbles: true, 
+                  cancelable: true, 
+                  view: window,
+                  button: 0,
+                  buttons: 1
+                });
+                var mouseUpEvent = new MouseEvent('mouseup', { 
+                  bubbles: true, 
+                  cancelable: true, 
+                  view: window,
+                  button: 0,
+                  buttons: 0
+                });
+                var clickEvent = new MouseEvent('click', { 
+                  bubbles: true, 
+                  cancelable: true, 
+                  view: window,
+                  button: 0,
+                  detail: 1
+                });
+                
+                el.dispatchEvent(mouseDownEvent);
+                await delay(50);
+                el.dispatchEvent(mouseUpEvent);
+                await delay(50);
+                el.dispatchEvent(clickEvent);
+                
+                // Clic DOM natif en dernier
+                el.click();
+                
+                console.log('[Tour Guide] Click events dispatched');
+              } catch(e){
+                console.error('[Tour Guide] Error dispatching events:', e);
+              }
+              
               if (o.navigate_to){ window.location.assign(o.navigate_to); return resolve({ index: i+1, navigated: true }); }
               // Si clic non naviguant sans wait_for, passer à l'étape suivante
               if (!o.wait_for) { continue; }
@@ -73,13 +132,23 @@
           // Attendre après l'action (si wait_for est défini)
           if (o.wait_for) { await waitForSelector(o.wait_for, o.wait_timeout); }
           if (o.delay_ms) { await delay(o.delay_ms); }
-          // Afficher Driver sur cette étape
+          
+          // Si resume="auto", continuer à l'étape suivante sans afficher Driver
+          if (o.resume === 'auto') {
+            console.log('[Tour Guide] Step', i, 'completed with resume=auto, continuing to next step');
+            continue; // Continuer la boucle
+          }
+          
+          // Sinon, afficher Driver sur cette étape
+          console.log('[Tour Guide] Orchestration complete at step', i, '- displaying Driver.js');
           return resolve({ index: i, navigated: false });
         } catch(e){ 
+          console.error('[Tour Guide] Error at step', i, ':', e);
           return resolve({ index: i, navigated: false }); 
         }
       }
       // Si tout a été consommé par des actions, rien à afficher
+      console.log('[Tour Guide] All steps consumed by orchestration, no popover to display');
       resolve({ index: steps.length, navigated: false });
     });
   }
@@ -107,6 +176,67 @@
         if (res.navigated) { return; }
         var indexToStart = Math.min(res.index||0, steps.length-1);
         console.log('[Tour Guide Editor] Defining steps from index', indexToStart, steps);
+        
+        // Ajouter le callback onNextClick dans chaque step.popover pour déclencher l'action
+        steps.forEach(function(step, idx) {
+          if (step.orchestrate && step.orchestrate.action === 'click') {
+            if (!step.popover) step.popover = {};
+            step.popover.onNextClick = async function() {
+              console.log('[Tour Guide] onNextClick - Step', idx, step.popover.title);
+              
+              // Vérifier si l'élément attendu existe déjà (panneau déjà ouvert)
+              var waitForSel = step.orchestrate.wait_for;
+              var alreadyOpen = false;
+              if (waitForSel) {
+                var existingEl = document.querySelector(waitForSel);
+                if (existingEl && existingEl.offsetParent !== null && existingEl.offsetHeight > 0 && existingEl.offsetWidth > 0) {
+                  alreadyOpen = true;
+                  console.log('[Tour Guide] Element already visible, skipping click:', waitForSel);
+                }
+              }
+              
+              // Ne cliquer que si l'élément n'est pas déjà ouvert
+              if (!alreadyOpen) {
+                var selector = step.orchestrate.action_selector || step.element;
+                var el = document.querySelector(selector);
+                if (el) {
+                  console.log('[Tour Guide] Clicking on:', selector);
+                  el.click();
+                  try {
+                    var mouseDownEvent = new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window, button: 0, buttons: 1 });
+                    var mouseUpEvent = new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window, button: 0, buttons: 0 });
+                    var clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true, view: window, button: 0, detail: 1 });
+                    el.dispatchEvent(mouseDownEvent);
+                    el.dispatchEvent(mouseUpEvent);
+                    el.dispatchEvent(clickEvent);
+                  } catch(e){
+                    console.error('[Tour Guide] Error dispatching click events:', e);
+                  }
+                  
+                  if (step.orchestrate.wait_for) {
+                    console.log('[Tour Guide] Waiting for:', step.orchestrate.wait_for);
+                    try {
+                      await waitForSelector(step.orchestrate.wait_for, step.orchestrate.wait_timeout || 5000);
+                      console.log('[Tour Guide] Element appeared:', step.orchestrate.wait_for);
+                    } catch(e) {
+                      console.warn('[Tour Guide] Timeout waiting for:', step.orchestrate.wait_for);
+                    }
+                  }
+                  if (step.orchestrate.delay_ms) {
+                    await delay(step.orchestrate.delay_ms);
+                  }
+                } else {
+                  console.warn('[Tour Guide] Element not found:', selector);
+                }
+              }
+              
+              // IMPORTANT: appeler moveNext() pour passer à l'étape suivante
+              console.log('[Tour Guide] Moving to next step');
+              driver.moveNext();
+            };
+          }
+        });
+        
         if (typeof driver.setConfig === 'function') {
           try { driver.setConfig({
             showButtons: ['previous','next','close'],
@@ -252,4 +382,39 @@
 
   // Expose to console for quick testing
   window.tourGuideStartEditor = function(custom){ startEditorTour(custom || []); };
+
+  // Auto-lancement si ?visite=ID dans l'URL
+  (function(){
+    var search = new URLSearchParams(window.location.search);
+    var visiteParam = search.get('visite');
+    
+    if (visiteParam && tours.length > 0) {
+      // Chercher le tour par xml_id
+      var tourByXmlId = tours.find(function(t){
+        return t.xml_id && String(t.xml_id) === String(visiteParam);
+      });
+      
+      if (tourByXmlId) {
+        // Attendre que l'éditeur soit vraiment prêt avant de lancer
+        var maxAttempts = 50; // 5 secondes max
+        var attempts = 0;
+        var interval = setInterval(function(){
+          attempts++;
+          // Vérifier qu'un élément de base de Gutenberg existe
+          if (document.querySelector('.editor-document-tools, .edit-post-header') || attempts >= maxAttempts) {
+            clearInterval(interval);
+            if (attempts < maxAttempts) {
+              // Petit délai pour laisser l'interface se stabiliser
+              setTimeout(function(){
+                console.log('[Tour Guide Editor] Auto-lancement de la visite:', visiteParam);
+                startEditorTour(tourByXmlId.steps, tourByXmlId.xml_id);
+              }, 500);
+            }
+          }
+        }, 100);
+      } else {
+        console.warn('[Tour Guide Editor] Visite non trouvée:', visiteParam);
+      }
+    }
+  })();
 })(window.wp || {});
