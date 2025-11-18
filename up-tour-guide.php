@@ -869,11 +869,19 @@ function tour_guide_enqueue_block_editor_assets() {
     wp_enqueue_script( 'driverjs' );
     wp_enqueue_style( 'driverjs-style' );
 
+    // CSS spécifique pour l'éditeur (z-index élevé pour être au-dessus de Gutenberg)
+    wp_enqueue_style(
+        'tour-guide-editor-style',
+        TOUR_GUIDE_URL . 'assets/editor.css',
+        array( 'driverjs-style' ),
+        TOUR_GUIDE_VERSION
+    );
+
     wp_enqueue_script(
         'tour-guide-editor',
         TOUR_GUIDE_URL . 'assets/editor.js',
-        array( 'wp-plugins', 'wp-edit-post', 'wp-element', 'wp-components', 'wp-i18n', 'driverjs' ),
-        null,
+        array( 'wp-plugins', 'wp-edit-post', 'wp-element', 'wp-components', 'wp-i18n', 'wp-data', 'driverjs' ),
+        TOUR_GUIDE_VERSION,
         true
     );
 

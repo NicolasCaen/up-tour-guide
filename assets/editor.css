@@ -1,0 +1,51 @@
+/* Forcer les éléments Driver.js au-dessus de l'interface Gutenberg */
+
+/* L'overlay de fond doit être au-dessus de tout */
+.driver-overlay,
+.driver-active .driver-overlay,
+body .driver-overlay,
+html .driver-overlay {
+  z-index: 9999999 !important;
+  position: fixed !important;
+}
+
+/* Le popover doit être encore plus haut */
+.driver-popover,
+.driver-active .driver-popover,
+body .driver-popover,
+html .driver-popover {
+  z-index: 10000000 !important;
+  position: fixed !important;
+}
+
+/* L'élément en surbrillance */
+.driver-highlighted-element,
+.driver-active .driver-highlighted-element,
+body .driver-highlighted-element,
+html .driver-highlighted-element {
+  z-index: 10000001 !important;
+}
+
+/* Styles supplémentaires pour l'éditeur */
+.editor-styles-wrapper .driver-popover {
+  max-width: 400px;
+}
+
+.driver-popover-title {
+  position: relative;
+  padding-right: 24px;
+}
+
+/* Bouton de fermeture */
+.driver-popover-close-btn {
+  display: inline-flex !important;
+  position: absolute !important;
+  top: 6px !important;
+  right: -11px !important;
+}
+
+/* Assurer que le popover est visible même dans le canvas de l'éditeur */
+.edit-post-visual-editor .driver-popover,
+.editor-styles-wrapper .driver-popover {
+  position: fixed !important;
+}

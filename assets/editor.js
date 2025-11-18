@@ -9,6 +9,8 @@
   var PanelBody = wp.components.PanelBody;
   var Button = wp.components.Button;
   var __ = wp.i18n.__;
+  var useDispatch = wp.data.useDispatch;
+  var useSelect = wp.data.useSelect;
 
   // Résoudre la bonne API Driver.js (ancienne globale Driver ou nouveau namespace driver.js.driver)
   function createDriverInstance(options) {
@@ -53,8 +55,7 @@
         var s = steps[i];
         var o = getOrch(s);
         try {
-          if (o.wait_for) { await waitForSelector(o.wait_for, o.wait_timeout); }
-          if (o.delay_ms) { await delay(o.delay_ms); }
+          // Gérer l'action de clic d'abord
           var actSel = o.action_selector && o.action_selector.trim() ? o.action_selector : s.element;
           if (o.action === 'click' && actSel){
             var el = document.querySelector(actSel);
@@ -65,13 +66,18 @@
               }
               el.click();
               if (o.navigate_to){ window.location.assign(o.navigate_to); return resolve({ index: i+1, navigated: true }); }
-              // Si clic non naviguant, continuer à la prochaine étape sans afficher Driver
-              continue;
+              // Si clic non naviguant sans wait_for, passer à l'étape suivante
+              if (!o.wait_for) { continue; }
             }
           }
-          // Si aucune action qui consomme l'étape, on affiche Driver à partir de cette étape
+          // Attendre après l'action (si wait_for est défini)
+          if (o.wait_for) { await waitForSelector(o.wait_for, o.wait_timeout); }
+          if (o.delay_ms) { await delay(o.delay_ms); }
+          // Afficher Driver sur cette étape
           return resolve({ index: i, navigated: false });
-        } catch(e){ return resolve({ index: i, navigated: false }); }
+        } catch(e){ 
+          return resolve({ index: i, navigated: false }); 
+        }
       }
       // Si tout a été consommé par des actions, rien à afficher
       resolve({ index: steps.length, navigated: false });
@@ -91,26 +97,7 @@
     });
     console.log('[Tour Guide Editor] startEditorTour called, driver instance:', driver);
     if (!driver) { console.warn('[Tour Guide Editor] Aucun driver disponible'); return; }
-    // HTML dans description (nouvelle API)
-    function toHtmlNode(str){
-      if (typeof str !== 'string') return str;
-      var div = document.createElement('div');
-      div.innerHTML = str;
-      return div;
-    }
-    if (typeof driver.setSteps === 'function'){
-      var _setSteps = driver.setSteps.bind(driver);
-      driver.setSteps = function(stepsArg){
-        var mapped = (stepsArg||[]).map(function(s){
-          var step = Object.assign({}, s);
-          var pop = step.popover || { title: step.title, description: step.description, position: step.position };
-          if (typeof pop.description === 'string') { pop = Object.assign({}, pop, { description: toHtmlNode(pop.description) }); }
-          step.popover = pop;
-          return step;
-        });
-        return _setSteps(mapped);
-      };
-    }
+    // NE PAS transformer les descriptions en HTML nodes - garder les strings
     (async function(){
       try {
         var resume = getResume();
@@ -132,8 +119,12 @@
           console.log('[Tour Guide Editor] Tour démarré (ancienne API)');
         } else if (typeof driver.setSteps === 'function' && typeof driver.drive === 'function') {
           driver.setSteps(steps || []);
-          if (typeof driver.drive === 'function') { driver.drive({ stepIndex: indexToStart }); }
-          else { driver.drive(); }
+          // Utiliser drive() sans options si indexToStart est 0
+          if (indexToStart === 0) {
+            driver.drive();
+          } else {
+            driver.drive(indexToStart);
+          }
           console.log('[Tour Guide Editor] Tour démarré (nouvelle API)');
         } else {
           console.warn('[Tour Guide Editor] API Driver inconnue');
@@ -179,8 +170,85 @@
   wp.plugins.registerPlugin('tour-guide', {
     render: function(){
       return el(wp.element.Fragment, null, el(SidebarItem), el(Sidebar));
-    }
+    },
+    icon: el('svg', { 
+      xmlns: 'http://www.w3.org/2000/svg', 
+      viewBox: '0 0 24 24', 
+      width: 24, 
+      height: 24 
+    }, el('path', { 
+      d: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z' 
+    }))
   });
+
+  // Injecter un bouton dans la toolbar
+  (function injectToolbarButton(){
+    if (!wp.data || !wp.data.dispatch || !wp.data.select) return;
+    
+    var retryCount = 0;
+    var maxRetries = 50;
+    
+    function tryInject(){
+      var pinnedItems = document.querySelector('.interface-pinned-items');
+      if (!pinnedItems) {
+        retryCount++;
+        if (retryCount < maxRetries) {
+          setTimeout(tryInject, 100);
+        }
+        return;
+      }
+      
+      // Vérifier si le bouton existe déjà
+      if (document.getElementById('tour-guide-toolbar-btn')) return;
+      
+      var btn = document.createElement('button');
+      btn.id = 'tour-guide-toolbar-btn';
+      btn.type = 'button';
+      btn.className = 'components-button is-compact has-icon';
+      btn.setAttribute('aria-label', labels.panelTitle);
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"></path></svg>';
+      
+      btn.addEventListener('click', function(){
+        try {
+          var dispatch = wp.data.dispatch('core/edit-post');
+          if (dispatch && dispatch.openGeneralSidebar) {
+            dispatch.openGeneralSidebar('tour-guide/tour-guide-sidebar');
+          }
+        } catch(e){
+          console.error('[Tour Guide] Erreur ouverture sidebar:', e);
+        }
+      });
+      
+      // Insérer le bouton au début de .interface-pinned-items
+      pinnedItems.insertBefore(btn, pinnedItems.firstChild);
+      
+      // Surveiller l'état ouvert/fermé pour le style pressed
+      if (wp.data.subscribe) {
+        wp.data.subscribe(function(){
+          try {
+            var select = wp.data.select('core/edit-post');
+            if (select && select.getActiveGeneralSidebarName) {
+              var isOpen = select.getActiveGeneralSidebarName() === 'tour-guide/tour-guide-sidebar';
+              if (isOpen) {
+                btn.setAttribute('aria-pressed', 'true');
+                btn.classList.add('is-pressed');
+              } else {
+                btn.setAttribute('aria-pressed', 'false');
+                btn.classList.remove('is-pressed');
+              }
+            }
+          } catch(e){}
+        });
+      }
+    }
+    
+    // Attendre que l'éditeur soit chargé
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', tryInject);
+    } else {
+      tryInject();
+    }
+  })();
 
   // Expose to console for quick testing
   window.tourGuideStartEditor = function(custom){ startEditorTour(custom || []); };
