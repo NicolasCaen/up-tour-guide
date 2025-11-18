@@ -30,6 +30,24 @@
       <delay_ms>0</delay_ms>
       <resume>none</resume>
     </step> 
-
+    <step selector=".block-editor-inserter__patterns-explore-button" position="right">
+      <title>Explorer les compositions</title>
+      <description><![CDATA[<p>Affiche le panneau de compositions.</p>]]></description>
+      <action>click</action>
+      <action_selector>.block-editor-inserter__patterns-explore-button</action_selector>
+      <wait_for>.components-modal__screen-overlay</wait_for>
+      <wait_timeout>3000</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step> 
+    <step selector=".components-modal__screen-overlay" position="right">
+      <title>Explorer les compositions</title>
+      <description><![CDATA[<p>Affiche le panneau de compositions.</p>]]></description>
+      <action>none</action>
+      <wait_for>.components-modal__screen-overlay</wait_for>
+      <wait_timeout>3000</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step> 
   </steps>
 </template>

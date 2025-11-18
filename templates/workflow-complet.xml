@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template id="workflow-complet" title="Workflow complet - Blocs et Compositions" context="editor">
+  <steps>
+    <!-- Étape d'introduction -->
+    <step selector=".edit-post-layout" position="top">
+      <title>Bienvenue dans le workflow complet</title>
+      <description><![CDATA[<p>Ce tour va vous montrer comment ajouter des blocs et des compositions dans votre éditeur.</p><p>Cliquez sur "Suivant" pour commencer.</p>]]></description>
+      <action>none</action>
+      <resume>none</resume>
+    </step>
+    
+    <!-- Inclusion du template "ajouter-block" -->
+    <!-- Décommentez la ligne ci-dessous pour inclure toutes les étapes de "ajouter-block" -->
+    <!-- <include template="ajouter-block" /> -->
+    
+    <!-- Étape intermédiaire -->
+    <step selector=".editor-document-tools" position="bottom">
+      <title>Transition</title>
+      <description><![CDATA[<p>Maintenant, passons aux compositions prédéfinies.</p>]]></description>
+      <action>none</action>
+      <resume>none</resume>
+    </step>
+    
+    <!-- Inclusion du template "ajouter-composition" -->
+    <!-- Décommentez la ligne ci-dessous pour inclure toutes les étapes de "ajouter-composition" -->
+    <!-- <include template="ajouter-composition" /> -->
+    
+    <!-- Étape finale -->
+    <step selector=".edit-post-layout" position="top">
+      <title>Félicitations !</title>
+      <description><![CDATA[<p>Vous savez maintenant comment utiliser les blocs et les compositions.</p><p><strong>Astuce :</strong> Vous pouvez combiner les deux pour créer des pages riches et variées.</p>]]></description>
+      <action>none</action>
+      <resume>none</resume>
+    </step>
+  </steps>
+</template>

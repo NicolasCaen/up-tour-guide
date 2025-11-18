@@ -315,12 +315,102 @@ L'orchestrateur (`runOrchestrationUntilDisplay()`) traite les étapes dans l'ord
 
 3. **Utiliser la console** : Les logs `[Tour Guide Editor]` indiquent l'état du tour.
 
+## Inclusion de templates (`<include>`)
+
+Vous pouvez réutiliser les étapes d'un autre template en utilisant la balise `<include>`. Cela permet de composer des tours complexes en combinant des templates existants.
+
+### Syntaxe
+
+```xml
+<include template="ID_DU_TEMPLATE" />
+```
+
+ou
+
+```xml
+<include id="ID_DU_TEMPLATE" />
+```
+
+**Paramètre :**
+- `template` ou `id` : L'ID du template à inclure (attribut `id` dans la balise `<template>`)
+
+### Exemple
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<template id="workflow-complet" title="Workflow complet" context="editor">
+  <steps>
+    <!-- Étapes personnalisées -->
+    <step selector=".my-custom-element" position="top">
+      <title>Étape initiale</title>
+      <description><![CDATA[<p>Début du workflow.</p>]]></description>
+    </step>
+    
+    <!-- Inclure toutes les étapes du template "ajouter-block" -->
+    <include template="ajouter-block" />
+    
+    <!-- Inclure toutes les étapes du template "ajouter-composition" -->
+    <include template="ajouter-composition" />
+    
+    <!-- Étapes personnalisées finales -->
+    <step selector=".final-element" position="bottom">
+      <title>Étape finale</title>
+      <description><![CDATA[<p>Fin du workflow.</p>]]></description>
+    </step>
+  </steps>
+</template>
+```
+
+### Fonctionnement
+
+- Les étapes du template inclus sont insérées **à l'endroit exact** où se trouve la balise `<include>`
+- Vous pouvez inclure plusieurs templates dans le même tour
+- Les includes peuvent être combinés avec des étapes normales
+- **Protection contre les boucles infinies** : Si un template A inclut B qui inclut A, la récursion est détectée et stoppée
+
+### Cas d'usage
+
+**1. Réutilisation de séquences communes**
+```xml
+<!-- Template "ouvrir-inserter" : séquence réutilisable -->
+<template id="ouvrir-inserter" title="Ouvrir inserteur" context="editor">
+  <steps>
+    <step selector=".editor-document-tools__inserter-toggle" position="bottom">
+      <action>click</action>
+      <wait_for>.editor-inserter-sidebar</wait_for>
+      <resume>auto</resume>
+    </step>
+  </steps>
+</template>
+
+<!-- Template principal qui réutilise la séquence -->
+<template id="mon-workflow" title="Mon workflow" context="editor">
+  <steps>
+    <include template="ouvrir-inserter" />
+    <!-- Suite des étapes... -->
+  </steps>
+</template>
+```
+
+**2. Composer des workflows longs**
+```xml
+<template id="formation-complete" title="Formation complète" context="editor">
+  <steps>
+    <include template="decouverte-interface" />
+    <include template="ajouter-block" />
+    <include template="ajouter-composition" />
+    <include template="publier-page" />
+  </steps>
+</template>
+```
+
 ## Limitations actuelles
 
 - **Navigation entre pages** : `navigate_to` n'est pas encore implémenté. Pour naviguer, utiliser `action="click"` sur un lien.
 - **Actions multiples** : Une seule action par étape. Pour enchaîner plusieurs actions, créer plusieurs étapes avec `resume="auto"`.
 - **Éléments dans iframes** : Driver.js fonctionne dans le contexte principal. Les éléments dans des iframes peuvent ne pas être ciblables.
 - **Sélecteurs dynamiques** : Les classes générées aléatoirement (ex: `css-abc123`) ne sont pas fiables. Préférer des classes stables.
+- **Includes récursifs** : Un template ne peut pas s'inclure lui-même (directement ou indirectement). La récursion est détectée et bloquée.
 
 ## Exemple complet : Tour d'insertion d'image dans Gutenberg
 

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: up-Tour guidé
  * Description: Visites guidées pour WordPress (Gutenberg et interface d’admin) avec Driver.js, gestion de templates XML activables.
- * Version: 0.1.10.0
+ * Version: 0.1.12.0
  * Author: GEHIN Nicolas
  * Text Domain: tour-guide
  * Domain Path: /languages
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'TOUR_GUIDE_VERSION', '0.1.10.0' );
+define( 'TOUR_GUIDE_VERSION', '0.1.12.0' );
 define( 'TOUR_GUIDE_FILE', __FILE__ );
 define( 'TOUR_GUIDE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TOUR_GUIDE_URL', plugin_dir_url( __FILE__ ) );
@@ -264,6 +264,8 @@ function tour_guide_render_templates_page() {
                     <tr>
                         <th><?php echo esc_html__( 'Étape', 'tour-guide' ); ?></th>
                         <th><?php echo esc_html__( 'Sélecteur CSS', 'tour-guide' ); ?></th>
+                        <th><?php echo esc_html__( 'Type', 'tour-guide' ); ?></th>
+                        <th><?php echo esc_html__( 'Template à inclure', 'tour-guide' ); ?></th>
                         <th><?php echo esc_html__( 'Titre', 'tour-guide' ); ?></th>
                         <th><?php echo esc_html__( 'Description', 'tour-guide' ); ?></th>
                         <th><?php echo esc_html__( 'Position', 'tour-guide' ); ?></th>
@@ -277,13 +279,33 @@ function tour_guide_render_templates_page() {
                     $existing_steps = $editing_template ? $editing_template['steps'] : array();
                     $rows_count = max( count( $existing_steps ), 1 );
                     for ( $i = 0; $i < $rows_count; $i++ ) {
-                        $step = isset( $existing_steps[ $i ] ) ? $existing_steps[ $i ] : array( 'selector' => '', 'title' => '', 'description' => '', 'position' => '', 'action' => 'none', 'action_selector' => '', 'wait_for' => '', 'wait_timeout' => '', 'delay_ms' => '', 'navigate_to' => '', 'resume' => 'none' );
+                        $step = isset( $existing_steps[ $i ] ) ? $existing_steps[ $i ] : array( 'type' => 'step', 'include_template' => '', 'selector' => '', 'title' => '', 'description' => '', 'position' => '', 'action' => 'none', 'action_selector' => '', 'wait_for' => '', 'wait_timeout' => '', 'delay_ms' => '', 'navigate_to' => '', 'resume' => 'none' );
                         ?>
                         <tr>
                             <td class="tg-sec-number"><?php echo ( $i + 1 ); ?></td>
                             <td class="tg-sec-selector">
-                                <span class="tg-cell-label"><span class="tg-info" data-tip="Sélecteur CSS de l’élément ciblé (ex: #menu-appearance, .my-class)">i</span></span>
+                                <span class="tg-cell-label"><span class="tg-info" data-tip="Sélecteur CSS de l'élément ciblé (ex: #menu-appearance, .my-class)">i</span></span>
                                 <input type="text" name="step_selector[]" value="<?php echo esc_attr( $step['selector'] ); ?>" class="regular-text" />
+                            </td>
+                            <td class="tg-sec-type">
+                                <span class="tg-cell-label"><span class="tg-info" data-tip="Type : Popup (bulle simple), Action (avec action automatique) ou Include (réutiliser un template)">i</span></span>
+                                <?php 
+                                $step_ui_type = 'popup'; // par défaut
+                                if ( isset($step['type']) && $step['type'] === 'include' ) {
+                                    $step_ui_type = 'include';
+                                } elseif ( isset($step['action']) && $step['action'] !== 'none' && $step['action'] !== '' ) {
+                                    $step_ui_type = 'action';
+                                }
+                                ?>
+                                <select name="step_type[]" class="tg-step-type">
+                                    <option value="popup" <?php selected( $step_ui_type, 'popup' ); ?>><?php echo esc_html__( 'Popup', 'tour-guide' ); ?></option>
+                                    <option value="action" <?php selected( $step_ui_type, 'action' ); ?>><?php echo esc_html__( 'Action', 'tour-guide' ); ?></option>
+                                    <option value="include" <?php selected( $step_ui_type, 'include' ); ?>><?php echo esc_html__( 'Include', 'tour-guide' ); ?></option>
+                                </select>
+                            </td>
+                            <td class="tg-sec-include" style="display:none!important;">
+                                <span class="tg-cell-label"><span class="tg-info" data-tip="ID du template à inclure (ex: ajouter-composition)">i</span></span>
+                                <input type="text" name="step_include_template[]" value="<?php echo esc_attr( isset($step['include_template']) ? $step['include_template'] : '' ); ?>" class="regular-text" placeholder="ex: ajouter-composition" />
                             </td>
                             <td class="tg-sec-title">
                                 <span class="tg-cell-label"><span class="tg-info" data-tip="Titre affiché dans la popover Driver.js">i</span></span>
@@ -421,49 +443,90 @@ function tour_guide_load_template_for_edit( $internal_id ) {
             if ( ! file_exists( $path ) ) {
                 return false;
             }
-            $steps_raw = tour_guide_parse_template_steps( $path );
+            
+            // Parser le XML manuellement pour détecter les includes (ne pas utiliser tour_guide_parse_template_steps qui les résout)
             $steps = array();
-            foreach ( $steps_raw as $s ) {
-                $orch = isset( $s['orchestrate'] ) && is_array( $s['orchestrate'] ) ? $s['orchestrate'] : array();
-
-                $desc_raw = isset( $s['popover']['description'] ) ? $s['popover']['description'] : '';
-                $desc_for_form = $desc_raw;
-                if ( '' !== $desc_for_form ) {
-                    $tmp = trim( $desc_for_form );
-                    // Supprimer systématiquement les balises <p> pour l’affichage dans le textarea.
-                    $without_p = preg_replace( '#</?p>\s*#i', "\n", $tmp );
-                    $lines = preg_split( "/\r\n|\r|\n/", $without_p );
-                    if ( $lines && is_array( $lines ) ) {
-                        $clean_lines = array();
-                        foreach ( $lines as $line ) {
-                            $line = trim( $line );
-                            if ( '' === $line ) {
-                                continue;
+            if ( function_exists( 'simplexml_load_file' ) ) {
+                $xml = @simplexml_load_file( $path );
+                if ( $xml && isset( $xml->steps ) ) {
+                    foreach ( $xml->steps->children() as $child ) {
+                        if ( $child->getName() === 'include' ) {
+                            // C'est un include
+                            $include_id = isset( $child['template'] ) ? (string) $child['template'] : '';
+                            if ( ! $include_id ) {
+                                $include_id = isset( $child['id'] ) ? (string) $child['id'] : '';
                             }
-                            $clean_lines[] = $line;
-                        }
-                        if ( ! empty( $clean_lines ) ) {
-                            $desc_for_form = implode( "\n", $clean_lines );
-                        } else {
-                            $desc_for_form = '';
+                            $steps[] = array(
+                                'type'            => 'include',
+                                'include_template'=> $include_id,
+                                'selector'        => '',
+                                'title'           => '',
+                                'description'     => '',
+                                'position'        => 'bottom',
+                                'action'          => 'none',
+                                'action_selector' => '',
+                                'wait_for'        => '',
+                                'wait_timeout'    => '',
+                                'delay_ms'        => '',
+                                'navigate_to'     => '',
+                                'resume'          => 'none',
+                            );
+                        } elseif ( $child->getName() === 'step' ) {
+                            // C'est une step normale
+                            $step_elem = $child;
+                            $selector = isset( $step_elem['selector'] ) ? (string) $step_elem['selector'] : 'body';
+                            $position = isset( $step_elem['position'] ) ? (string) $step_elem['position'] : 'bottom';
+                            $title    = isset( $step_elem->title ) ? trim( (string) $step_elem->title ) : '';
+                            $desc_raw = isset( $step_elem->description ) ? trim( (string) $step_elem->description ) : '';
+                            
+                            // Traiter la description
+                            $desc_for_form = $desc_raw;
+                            if ( '' !== $desc_for_form ) {
+                                $tmp = trim( $desc_for_form );
+                                $without_p = preg_replace( '#</?p>\s*#i', "\n", $tmp );
+                                $lines = preg_split( "/\r\n|\r|\n/", $without_p );
+                                if ( $lines && is_array( $lines ) ) {
+                                    $clean_lines = array();
+                                    foreach ( $lines as $line ) {
+                                        $line = trim( $line );
+                                        if ( '' === $line ) continue;
+                                        $clean_lines[] = $line;
+                                    }
+                                    if ( ! empty( $clean_lines ) ) {
+                                        $desc_for_form = implode( "\n", $clean_lines );
+                                    } else {
+                                        $desc_for_form = '';
+                                    }
+                                }
+                            }
+                            
+                            // Orchestration
+                            $action          = isset( $step_elem->action ) ? trim( (string) $step_elem->action ) : 'none';
+                            $action_selector = isset( $step_elem->action_selector ) ? trim( (string) $step_elem->action_selector ) : '';
+                            $wait_for        = isset( $step_elem->wait_for ) ? trim( (string) $step_elem->wait_for ) : '';
+                            $wait_timeout    = isset( $step_elem->wait_timeout ) ? intval( (string) $step_elem->wait_timeout ) : '';
+                            $delay_ms        = isset( $step_elem->delay_ms ) ? intval( (string) $step_elem->delay_ms ) : '';
+                            $navigate_to     = isset( $step_elem->navigate_to ) ? trim( (string) $step_elem->navigate_to ) : '';
+                            $resume          = isset( $step_elem->resume ) ? trim( (string) $step_elem->resume ) : 'none';
+                            
+                            $steps[] = array(
+                                'type'            => 'step',
+                                'selector'        => $selector,
+                                'title'           => $title,
+                                'description'     => $desc_for_form,
+                                'position'        => $position,
+                                'action'          => $action,
+                                'action_selector' => $action_selector,
+                                'wait_for'        => $wait_for,
+                                'wait_timeout'    => $wait_timeout,
+                                'delay_ms'        => $delay_ms,
+                                'navigate_to'     => $navigate_to,
+                                'resume'          => $resume,
+                                'include_template'=> '',
+                            );
                         }
                     }
                 }
-
-                $steps[] = array(
-                    'selector'        => isset( $s['element'] ) ? $s['element'] : '',
-                    'title'           => isset( $s['popover']['title'] ) ? $s['popover']['title'] : '',
-                    'description'     => $desc_for_form,
-                    'position'        => isset( $s['popover']['position'] ) ? $s['popover']['position'] : 'bottom',
-                    // Orchestration
-                    'action'          => isset( $orch['action'] ) ? $orch['action'] : 'none',
-                    'action_selector' => isset( $orch['action_selector'] ) ? $orch['action_selector'] : '',
-                    'wait_for'        => isset( $orch['wait_for'] ) ? $orch['wait_for'] : '',
-                    'wait_timeout'    => isset( $orch['wait_timeout'] ) ? $orch['wait_timeout'] : '',
-                    'delay_ms'        => isset( $orch['delay_ms'] ) ? $orch['delay_ms'] : '',
-                    'navigate_to'     => isset( $orch['navigate_to'] ) ? $orch['navigate_to'] : '',
-                    'resume'          => isset( $orch['resume'] ) ? $orch['resume'] : 'none',
-                );
             }
 
             // Récupérer l’attribut id et le contexte du template depuis le XML
@@ -507,6 +570,8 @@ function tour_guide_handle_save_template_post() {
         $context = 'all';
     }
 
+    $step_types      = isset( $_POST['step_type'] ) ? (array) $_POST['step_type'] : array();
+    $include_templates = isset( $_POST['step_include_template'] ) ? (array) $_POST['step_include_template'] : array();
     $selectors    = isset( $_POST['step_selector'] ) ? (array) $_POST['step_selector'] : array();
     $titles       = isset( $_POST['step_title'] ) ? (array) $_POST['step_title'] : array();
     $descriptions = isset( $_POST['step_description'] ) ? (array) $_POST['step_description'] : array();
@@ -520,8 +585,23 @@ function tour_guide_handle_save_template_post() {
     $resume       = isset( $_POST['step_resume'] ) ? (array) $_POST['step_resume'] : array();
 
     $steps = array();
-    $count = max( count( $selectors ), count( $titles ), count( $descriptions ), count( $positions ), count($actions), count($act_selectors), count($wait_for), count($wait_timeout), count($delay_ms), count($navigate_to), count($resume) );
+    $count = max( count( $step_types ), count( $selectors ), count( $titles ), count( $descriptions ), count( $positions ), count($actions), count($act_selectors), count($wait_for), count($wait_timeout), count($delay_ms), count($navigate_to), count($resume), count($include_templates) );
     for ( $i = 0; $i < $count; $i++ ) {
+        $step_ui_type = isset( $step_types[ $i ] ) ? trim( wp_unslash( $step_types[ $i ] ) ) : 'popup';
+        
+        // Si c'est un include
+        if ( $step_ui_type === 'include' ) {
+            $include_id = isset( $include_templates[ $i ] ) ? trim( wp_unslash( $include_templates[ $i ] ) ) : '';
+            if ( '' !== $include_id ) {
+                $steps[] = array(
+                    'type' => 'include',
+                    'include_template' => $include_id,
+                );
+            }
+            continue;
+        }
+        
+        // Sinon c'est une step normale (popup ou action)
         $sel  = isset( $selectors[ $i ] ) ? trim( wp_unslash( $selectors[ $i ] ) ) : '';
         $st   = isset( $titles[ $i ] ) ? trim( wp_unslash( $titles[ $i ] ) ) : '';
         $desc = isset( $descriptions[ $i ] ) ? trim( wp_unslash( $descriptions[ $i ] ) ) : '';
@@ -557,12 +637,24 @@ function tour_guide_handle_save_template_post() {
         if ( '' === $pos ) {
             $pos = 'bottom';
         }
+        
+        // Mapping UI type → action
+        $action_value = 'none';
+        if ( $step_ui_type === 'action' ) {
+            // Pour une action, utiliser l'action du formulaire ou 'click' par défaut
+            $action_value = isset($actions[$i]) ? sanitize_text_field( wp_unslash($actions[$i]) ) : 'click';
+            if ( $action_value === 'none' || $action_value === '' ) {
+                $action_value = 'click';
+            }
+        }
+        
         $steps[] = array(
+            'type'        => 'step',
             'selector'    => $sel,
             'title'       => $st,
             'description' => $desc,
             'position'    => $pos,
-            'action'      => isset($actions[$i]) ? sanitize_text_field( wp_unslash($actions[$i]) ) : 'none',
+            'action'      => $action_value,
             'action_selector' => isset($act_selectors[$i]) ? trim( wp_unslash($act_selectors[$i]) ) : '',
             'wait_for'    => isset($wait_for[$i]) ? trim( wp_unslash($wait_for[$i]) ) : '',
             'wait_timeout'=> isset($wait_timeout[$i]) ? intval($wait_timeout[$i]) : '',
@@ -620,16 +712,33 @@ function tour_guide_handle_save_template_post() {
     );
 }
 
+// Helper pour échapper les attributs XML
+function tour_guide_esc_xml( $text ) {
+    return htmlspecialchars( $text, ENT_XML1 | ENT_QUOTES, 'UTF-8' );
+}
+
 // Construire le XML d’un template à partir de données de formulaire
 function tour_guide_build_template_xml( $attr_id, $title, $steps, $context = 'all' ) {
-    $attr_id_esc = esc_attr( $attr_id );
-    $title_esc   = esc_attr( $title );
-    $context_esc = esc_attr( $context );
+    $attr_id_esc = tour_guide_esc_xml( $attr_id );
+    $title_esc   = tour_guide_esc_xml( $title );
+    $context_esc = tour_guide_esc_xml( $context );
 
     $xml  = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
     $xml .= '<template id="' . $attr_id_esc . '" title="' . $title_esc . '" context="' . $context_esc . '">' . "\n";
     $xml .= "  <steps>\n";
     foreach ( $steps as $step ) {
+        $step_type = isset( $step['type'] ) ? $step['type'] : 'step';
+        
+        // Si c'est un include
+        if ( $step_type === 'include' ) {
+            $include_id = isset( $step['include_template'] ) ? $step['include_template'] : '';
+            if ( '' !== $include_id ) {
+                $xml .= '    <include template="' . tour_guide_esc_xml( $include_id ) . '" />' . "\n";
+            }
+            continue;
+        }
+        
+        // Sinon c'est une step normale
         $selector = isset( $step['selector'] ) ? $step['selector'] : '';
         $st       = isset( $step['title'] ) ? $step['title'] : '';
         $desc     = isset( $step['description'] ) ? $step['description'] : '';
@@ -808,50 +917,96 @@ function tour_guide_get_steps_from_templates( $active_only = true, $context_filt
 }
 
 // Parse un template XML vers des steps Driver.js
-function tour_guide_parse_template_steps( $filepath ) {
+function tour_guide_parse_template_steps( $filepath, $included_ids = array() ) {
     $results = array();
     $content = @file_get_contents( $filepath );
     if ( ! $content ) { return $results; }
+    
+    // Récupérer l'ID du template actuel pour éviter les boucles infinies
+    $current_id = '';
+    if ( preg_match( '/<template[^>]*id="([^"]+)"/i', $content, $m ) ) {
+        $current_id = trim( $m[1] );
+        // Vérifier si on a déjà inclus ce template (boucle infinie)
+        if ( in_array( $current_id, $included_ids ) ) {
+            return $results; // Éviter la récursion infinie
+        }
+        $included_ids[] = $current_id;
+    }
+    
     // Utiliser SimpleXML si dispo
     if ( function_exists( 'simplexml_load_string' ) ) {
         $xml = @simplexml_load_string( $content );
         if ( $xml && isset( $xml->steps ) ) {
-            foreach ( $xml->steps->step as $step ) {
-                $selector = isset( $step['selector'] ) ? (string) $step['selector'] : 'body';
-                $position = isset( $step['position'] ) ? (string) $step['position'] : 'bottom';
-                $title    = isset( $step->title ) ? trim( (string) $step->title ) : '';
-                $desc     = isset( $step->description ) ? trim( (string) $step->description ) : '';
-                // Orchestration (facultatif)
-                $action   = isset( $step->action ) ? trim( (string) $step->action ) : '';
-                $action_selector = isset( $step->action_selector ) ? trim( (string) $step->action_selector ) : '';
-                $wait_for = isset( $step->wait_for ) ? trim( (string) $step->wait_for ) : '';
-                $wait_timeout = isset( $step->wait_timeout ) ? intval( (string) $step->wait_timeout ) : '';
-                $delay_ms = isset( $step->delay_ms ) ? intval( (string) $step->delay_ms ) : '';
-                $navigate_to = isset( $step->navigate_to ) ? trim( (string) $step->navigate_to ) : '';
-                $resume  = isset( $step->resume ) ? trim( (string) $step->resume ) : '';
+            foreach ( $xml->steps->children() as $child ) {
+                // Détecter les balises <include>
+                if ( $child->getName() === 'include' ) {
+                    $include_id = isset( $child['template'] ) ? trim( (string) $child['template'] ) : '';
+                    if ( ! $include_id ) {
+                        $include_id = isset( $child['id'] ) ? trim( (string) $child['id'] ) : '';
+                    }
+                    
+                    if ( $include_id && ! in_array( $include_id, $included_ids ) ) {
+                        // Chercher le template à inclure
+                        $include_path = tour_guide_find_template_by_id( $include_id );
+                        if ( $include_path ) {
+                            // Récursion : parser le template inclus
+                            $included_steps = tour_guide_parse_template_steps( $include_path, $included_ids );
+                            $results = array_merge( $results, $included_steps );
+                        }
+                    }
+                    continue;
+                }
+                
+                // Traiter les balises <step> normales
+                if ( $child->getName() === 'step' ) {
+                    $step = $child;
+                    $selector = isset( $step['selector'] ) ? (string) $step['selector'] : 'body';
+                    $position = isset( $step['position'] ) ? (string) $step['position'] : 'bottom';
+                    $title    = isset( $step->title ) ? trim( (string) $step->title ) : '';
+                    $desc     = isset( $step->description ) ? trim( (string) $step->description ) : '';
+                    // Orchestration (facultatif)
+                    $action   = isset( $step->action ) ? trim( (string) $step->action ) : '';
+                    $action_selector = isset( $step->action_selector ) ? trim( (string) $step->action_selector ) : '';
+                    $wait_for = isset( $step->wait_for ) ? trim( (string) $step->wait_for ) : '';
+                    $wait_timeout = isset( $step->wait_timeout ) ? intval( (string) $step->wait_timeout ) : '';
+                    $delay_ms = isset( $step->delay_ms ) ? intval( (string) $step->delay_ms ) : '';
+                    $navigate_to = isset( $step->navigate_to ) ? trim( (string) $step->navigate_to ) : '';
+                    $resume  = isset( $step->resume ) ? trim( (string) $step->resume ) : '';
 
-                $results[] = array(
-                    'element' => $selector,
-                    'popover' => array(
-                        'title'       => $title,
-                        'description' => $desc,
-                        'position'    => $position,
-                    ),
-                    // Exposer aussi au JS
-                    'orchestrate' => array(
-                        'action' => $action,
-                        'action_selector' => $action_selector,
-                        'wait_for' => $wait_for,
-                        'wait_timeout' => $wait_timeout,
-                        'delay_ms' => $delay_ms,
-                        'navigate_to' => $navigate_to,
-                        'resume' => $resume,
-                    ),
-                );
+                    $results[] = array(
+                        'element' => $selector,
+                        'popover' => array(
+                            'title'       => $title,
+                            'description' => $desc,
+                            'position'    => $position,
+                        ),
+                        // Exposer aussi au JS
+                        'orchestrate' => array(
+                            'action' => $action,
+                            'action_selector' => $action_selector,
+                            'wait_for' => $wait_for,
+                            'wait_timeout' => $wait_timeout,
+                            'delay_ms' => $delay_ms,
+                            'navigate_to' => $navigate_to,
+                            'resume' => $resume,
+                        ),
+                    );
+                }
             }
         }
     }
     return $results;
+}
+
+// Fonction helper pour trouver un template par son ID XML
+function tour_guide_find_template_by_id( $template_id ) {
+    $all = tour_guide_list_all_templates();
+    foreach ( $all as $tpl ) {
+        if ( isset( $tpl['attr_id'] ) && $tpl['attr_id'] === $template_id ) {
+            return $tpl['path'];
+        }
+    }
+    return false;
 }
 
 // Exposer steps au frontend via wp_localize_script

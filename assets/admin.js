@@ -392,6 +392,70 @@
       window.addEventListener('scroll', function(){ if (open){ computePosition(); } }, true);
     })();
 
+    // Gestion visibilité selon le type (popup / action / include)
+    function applyTypeVisibilityForRow(tr){
+      if (!tr) return;
+      var typeSel = tr.querySelector('select.tg-step-type');
+      if (!typeSel) return;
+      
+      var type = typeSel.value; // 'popup', 'action', ou 'include'
+      var isInclude = type === 'include';
+      var isPopup = type === 'popup';
+      var isAction = type === 'action';
+      
+      // Colonnes communes à popup et action (toujours visibles sauf pour include)
+      var commonCols = [
+        tr.querySelector('.tg-sec-selector'),
+        tr.querySelector('.tg-sec-title'),
+        tr.querySelector('.tg-sec-desc'),
+        tr.querySelector('.tg-sec-position')
+      ];
+      
+      // Colonnes uniquement pour action
+      var actionOnlyCols = [
+        tr.querySelector('.tg-sec-action'),
+        tr.querySelector('.tg-sec-wait'),
+        tr.querySelector('.tg-sec-resume')
+      ];
+      
+      var includeCol = tr.querySelector('.tg-sec-include');
+      
+      // Afficher les colonnes communes sauf si include
+      commonCols.forEach(function(col){ 
+        if (!col) return;
+        if (isInclude) {
+          col.style.setProperty('display', 'none', 'important');
+        } else {
+          col.style.setProperty('display', 'table-cell', 'important');
+        }
+      });
+      
+      // Afficher les colonnes d'action seulement si type=action
+      actionOnlyCols.forEach(function(col){ 
+        if (!col) return;
+        if (isAction) {
+          col.style.setProperty('display', 'table-cell', 'important');
+        } else {
+          col.style.setProperty('display', 'none', 'important');
+        }
+      });
+      
+      // Afficher la colonne include seulement si type=include
+      if (includeCol) {
+        if (isInclude) {
+          includeCol.style.setProperty('display', 'table-cell', 'important');
+        } else {
+          includeCol.style.setProperty('display', 'none', 'important');
+        }
+      }
+    }
+    
+    function applyTypeVisibilityAll(){
+      var tbody = document.querySelector('#tour-guide-steps-table tbody');
+      if (!tbody) return;
+      Array.prototype.forEach.call(tbody.querySelectorAll('tr'), applyTypeVisibilityForRow);
+    }
+    
     // Gestion visibilité des champs d'action
     function applyActionVisibilityForRow(tr){
       if (!tr) return;
@@ -406,12 +470,17 @@
       if (!tbody) return;
       Array.prototype.forEach.call(tbody.querySelectorAll('tr'), applyActionVisibilityForRow);
     }
+    applyTypeVisibilityAll();
     applyActionVisibilityAll();
     var stepsTable = document.getElementById('tour-guide-steps-table');
     stepsTable && stepsTable.addEventListener('change', function(e){
       if (e.target && e.target.name === 'step_action[]'){
         var tr = e.target.closest('tr');
         applyActionVisibilityForRow(tr);
+      }
+      if (e.target && e.target.classList.contains('tg-step-type')){
+        var tr = e.target.closest('tr');
+        applyTypeVisibilityForRow(tr);
       }
     });
 
@@ -442,6 +511,7 @@
         newRow.classList.add('tg-card');
         tbody.appendChild(newRow);
         renumberRows(tbody);
+        applyTypeVisibilityForRow(newRow);
         applyActionVisibilityForRow(newRow);
       });
     }
