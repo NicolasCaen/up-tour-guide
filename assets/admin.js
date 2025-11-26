@@ -330,7 +330,6 @@
         } else {
           menuTours.forEach(function(t){
             var a = document.createElement('a');
-            a.href = '#';
             a.style.display = 'block';
             a.style.padding = '10px 12px';
             a.style.color = '#fff';
@@ -338,7 +337,31 @@
             a.textContent = decodeHtml(t.title || '');
             a.addEventListener('mouseenter', function(){ a.style.background = '#2c3338'; });
             a.addEventListener('mouseleave', function(){ a.style.background = 'transparent'; });
-            a.addEventListener('click', function(ev){ ev.preventDefault(); ev.stopPropagation(); hide(); startTour(t.steps, t.id); });
+
+            if (t.page_start && t.page_start.trim() !== '') {
+              // Lien vers une page spécifique avec ?visite=ID
+              var sep = (t.page_start.indexOf('?') !== -1) ? '&' : '?';
+              // Si t.xml_id est vide, on utilise t.id comme fallback ? Non, le XML id est préférable pour ?visite=
+              var idParam = t.xml_id || t.id; 
+              a.href = t.page_start + sep + 'visite=' + encodeURIComponent(idParam);
+              
+              // On laisse le comportement par défaut (navigation), mais on ferme le menu
+              a.addEventListener('click', function(ev){ 
+                 // Pas de preventDefault() car on veut naviguer
+                 ev.stopPropagation(); 
+                 hide(); 
+              });
+            } else {
+              // Comportement classique : lancement direct sur la page courante
+              a.href = '#';
+              a.addEventListener('click', function(ev){ 
+                ev.preventDefault(); 
+                ev.stopPropagation(); 
+                hide(); 
+                startTour(t.steps, t.id); 
+              });
+            }
+            
             dd.appendChild(a);
           });
         }

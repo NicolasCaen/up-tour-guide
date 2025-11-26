@@ -2,7 +2,7 @@
 /**
  * Plugin Name: up-Tour guidé
  * Description: Visites guidées pour WordPress (Gutenberg et interface d’admin) avec Driver.js, gestion de templates XML activables.
- * Version: 0.1.12.0
+ * Version: 0.1.13.0
  * Author: GEHIN Nicolas
  * Text Domain: tour-guide
  * Domain Path: /languages
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'TOUR_GUIDE_VERSION', '0.1.12.0' );
+define( 'TOUR_GUIDE_VERSION', '0.1.13.0' );
 define( 'TOUR_GUIDE_FILE', __FILE__ );
 define( 'TOUR_GUIDE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TOUR_GUIDE_URL', plugin_dir_url( __FILE__ ) );
@@ -131,6 +131,17 @@ function tour_guide_admin_menu() {
 }
 add_action( 'admin_menu', 'tour_guide_admin_menu' );
 
+function tour_guide_handle_export_action() {
+    if ( isset( $_POST['tour_guide_action'] ) && $_POST['tour_guide_action'] === 'export_template' && isset( $_POST['template_id'] ) ) {
+        if ( check_admin_referer( 'tour_guide_templates' ) && current_user_can( 'manage_options' ) ) {
+            $exp_id = sanitize_text_field( $_POST['template_id'] );
+            tour_guide_export_template( $exp_id );
+            // Si export échoue (fichier non trouvé), on laisse continuer pour afficher l'erreur
+        }
+    }
+}
+add_action( 'admin_init', 'tour_guide_handle_export_action' );
+
 function tour_guide_render_templates_page() {
     if ( ! current_user_can( 'manage_options' ) ) {
         return;
@@ -174,6 +185,20 @@ function tour_guide_render_templates_page() {
                 echo '<div class="error"><p>' . esc_html( $result['message'] ) . '</p></div>';
             }
         }
+        if ( $_POST['tour_guide_action'] === 'delete_template' && isset( $_POST['template_id'] ) ) {
+            $del_id = sanitize_text_field( $_POST['template_id'] );
+            $deleted = tour_guide_delete_template( $del_id );
+            if ( $deleted ) {
+                echo '<div class="updated"><p>' . esc_html__( 'Template supprimé.', 'tour-guide' ) . '</p></div>';
+            } else {
+                echo '<div class="error"><p>' . esc_html__( 'Impossible de supprimer ce template.', 'tour-guide' ) . '</p></div>';
+            }
+        }
+        if ( $_POST['tour_guide_action'] === 'export_template' && isset( $_POST['template_id'] ) ) {
+             // L'export est géré par tour_guide_handle_export_action via admin_init.
+             // Si on arrive ici, c'est que l'export a échoué (ex: exit non appelé car fichier introuvable).
+             echo '<div class="error"><p>' . esc_html__( 'Impossible d’exporter ce template (fichier introuvable).', 'tour-guide' ) . '</p></div>';
+        }
     }
 
     $edit_id = isset( $_GET['edit'] ) ? sanitize_text_field( wp_unslash( $_GET['edit'] ) ) : '';
@@ -199,6 +224,13 @@ function tour_guide_render_templates_page() {
                         <input name="template_attr_id" id="template_attr_id" type="text" class="regular-text" value="<?php echo $editing_template ? esc_attr( $editing_template['attr_id'] ) : ''; ?>" />
 
                         <p class="description"><?php echo esc_html__( 'Utilisé dans l’attribut id="" du template XML. Peut aussi servir à lancer une visite via l’URL, par exemple ?visite=mon-id.', 'tour-guide' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="template_page_start"><?php echo esc_html__( 'Démarrer la visite sur', 'tour-guide' ); ?></label></th>
+                    <td>
+                        <input name="template_page_start" id="template_page_start" type="text" class="regular-text" value="<?php echo $editing_template ? esc_attr( isset($editing_template['page_start']) ? $editing_template['page_start'] : '' ) : ''; ?>" placeholder="/ma-page.php" />
+                        <p class="description"><?php echo esc_html__( 'Si renseigné, le lien dans le menu redirigera vers cette page avec ?visite=ID (ex: /admin.php -> /admin.php?visite=mon-id).', 'tour-guide' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -386,42 +418,135 @@ function tour_guide_render_templates_page() {
 
         <h2><?php echo esc_html__( 'Visites disponibles', 'tour-guide' ); ?></h2>
         <p class="description"><?php echo esc_html__( 'Configurez la disponibilité de chaque visite : dans le menu et/ou accessible par URL directe.', 'tour-guide' ); ?></p>
+        
+        <?php
+        // Séparer les templates par origine
+        $plugin_templates = array();
+        $uploaded_templates = array();
+        foreach ( $all as $tpl ) {
+            if ( $tpl['source'] === 'plugin' ) {
+                $plugin_templates[] = $tpl;
+            } else {
+                $uploaded_templates[] = $tpl;
+            }
+        }
+        ?>
+
         <form method="post">
             <?php wp_nonce_field( 'tour_guide_templates' ); ?>
             <input type="hidden" name="tour_guide_action" value="save_activation" />
-            <table id="tour-guide-templates-activation" class="widefat fixed" style="max-width: 900px;">
-                <thead>
-                    <tr>
-                        <th><?php echo esc_html__( 'Disponibilité', 'tour-guide' ); ?></th>
-                        <th><?php echo esc_html__( 'Fichier', 'tour-guide' ); ?></th>
-                        <th><?php echo esc_html__( 'Titre', 'tour-guide' ); ?></th>
-                        <th><?php echo esc_html__( 'Origine', 'tour-guide' ); ?></th>
-                        <th><?php echo esc_html__( 'Actions', 'tour-guide' ); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    foreach ( $all as $tpl ) :
-                        $current_status = isset( $active[ $tpl['id'] ] ) ? $active[ $tpl['id'] ] : 'disabled';
-                    ?>
+            
+            <?php if ( ! empty( $plugin_templates ) ) : ?>
+                <h3><?php echo esc_html__( 'Templates du Plugin (Lecture seule)', 'tour-guide' ); ?></h3>
+                <table class="widefat fixed" style="max-width: 900px; margin-bottom: 20px;">
+                    <thead>
                         <tr>
-                            <td>
-                                <select name="template_status[<?php echo esc_attr( $tpl['id'] ); ?>]" style="width: 100%;">
-                                    <option value="disabled" <?php selected( $current_status, 'disabled' ); ?>><?php echo esc_html__( 'Désactivé', 'tour-guide' ); ?></option>
-                                    <option value="menu" <?php selected( $current_status, 'menu' ); ?>><?php echo esc_html__( 'Menu + URL', 'tour-guide' ); ?></option>
-                                    <option value="url_only" <?php selected( $current_status, 'url_only' ); ?>><?php echo esc_html__( 'URL uniquement', 'tour-guide' ); ?></option>
-                                </select>
-                            </td>
-                            <td><?php echo esc_html( $tpl['file'] ); ?></td>
-                            <td><?php echo esc_html( $tpl['title'] ); ?></td>
-                            <td><?php echo esc_html( $tpl['source'] ); ?></td>
-                            <td><a href="<?php echo esc_url( admin_url( 'admin.php?page=tour-guide-templates&edit=' . urlencode( $tpl['id'] ) ) ); ?>" class="button button-small"><?php echo esc_html__( 'Modifier', 'tour-guide' ); ?></a></td>
+                            <th><?php echo esc_html__( 'Disponibilité', 'tour-guide' ); ?></th>
+                            <th><?php echo esc_html__( 'Fichier', 'tour-guide' ); ?></th>
+                            <th><?php echo esc_html__( 'Titre', 'tour-guide' ); ?></th>
+                            <th><?php echo esc_html__( 'Actions', 'tour-guide' ); ?></th>
                         </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-            <p><button type="submit" class="button button-primary"><?php echo esc_html__( 'Enregistrer', 'tour-guide' ); ?></button></p>
+                    </thead>
+                    <tbody>
+                        <?php foreach ( $plugin_templates as $tpl ) : 
+                            $current_status = isset( $active[ $tpl['id'] ] ) ? $active[ $tpl['id'] ] : 'disabled';
+                        ?>
+                            <tr>
+                                <td>
+                                    <select name="template_status[<?php echo esc_attr( $tpl['id'] ); ?>]" style="width: 100%;">
+                                        <option value="disabled" <?php selected( $current_status, 'disabled' ); ?>><?php echo esc_html__( 'Désactivé', 'tour-guide' ); ?></option>
+                                        <option value="menu" <?php selected( $current_status, 'menu' ); ?>><?php echo esc_html__( 'Menu + URL', 'tour-guide' ); ?></option>
+                                        <option value="url_only" <?php selected( $current_status, 'url_only' ); ?>><?php echo esc_html__( 'URL uniquement', 'tour-guide' ); ?></option>
+                                    </select>
+                                </td>
+                                <td><?php echo esc_html( $tpl['file'] ); ?></td>
+                                <td><?php echo esc_html( $tpl['title'] ); ?></td>
+                                <td>
+                                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=tour-guide-templates&edit=' . urlencode( $tpl['id'] ) ) ); ?>" class="button button-small"><?php echo esc_html__( 'Modifier', 'tour-guide' ); ?></a>
+                                    <button type="button" class="button button-small tour-guide-export-btn" data-id="<?php echo esc_attr( $tpl['id'] ); ?>" style="margin-left: 5px;"><?php echo esc_html__( 'Exporter', 'tour-guide' ); ?></button>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+
+            <?php if ( ! empty( $uploaded_templates ) ) : ?>
+                <h3><?php echo esc_html__( 'Templates Uploadés', 'tour-guide' ); ?></h3>
+                <table class="widefat fixed tour-guide-uploaded-table" style="max-width: 900px;">
+                    <thead>
+                        <tr>
+                            <th><?php echo esc_html__( 'Disponibilité', 'tour-guide' ); ?></th>
+                            <th><?php echo esc_html__( 'Fichier', 'tour-guide' ); ?></th>
+                            <th><?php echo esc_html__( 'Titre', 'tour-guide' ); ?></th>
+                            <th><?php echo esc_html__( 'Actions', 'tour-guide' ); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ( $uploaded_templates as $tpl ) : 
+                            $current_status = isset( $active[ $tpl['id'] ] ) ? $active[ $tpl['id'] ] : 'disabled';
+                        ?>
+                            <tr>
+                                <td>
+                                    <select name="template_status[<?php echo esc_attr( $tpl['id'] ); ?>]" style="width: 100%;">
+                                        <option value="disabled" <?php selected( $current_status, 'disabled' ); ?>><?php echo esc_html__( 'Désactivé', 'tour-guide' ); ?></option>
+                                        <option value="menu" <?php selected( $current_status, 'menu' ); ?>><?php echo esc_html__( 'Menu + URL', 'tour-guide' ); ?></option>
+                                        <option value="url_only" <?php selected( $current_status, 'url_only' ); ?>><?php echo esc_html__( 'URL uniquement', 'tour-guide' ); ?></option>
+                                    </select>
+                                </td>
+                                <td><?php echo esc_html( $tpl['file'] ); ?></td>
+                                <td><?php echo esc_html( $tpl['title'] ); ?></td>
+                                <td>
+                                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=tour-guide-templates&edit=' . urlencode( $tpl['id'] ) ) ); ?>" class="button button-small"><?php echo esc_html__( 'Modifier', 'tour-guide' ); ?></a>
+                                    <button type="button" class="button button-small tour-guide-export-btn" data-id="<?php echo esc_attr( $tpl['id'] ); ?>" style="margin-left: 5px;"><?php echo esc_html__( 'Exporter', 'tour-guide' ); ?></button>
+                                    <button type="button" class="button button-small button-link-delete tour-guide-delete-btn" data-id="<?php echo esc_attr( $tpl['id'] ); ?>" style="color: #b32d2e; margin-left: 5px;"><?php echo esc_html__( 'Supprimer', 'tour-guide' ); ?></button>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+
+            <p><button type="submit" class="button button-primary"><?php echo esc_html__( 'Enregistrer la disponibilité', 'tour-guide' ); ?></button></p>
         </form>
+        
+        <!-- Formulaire caché pour la suppression -->
+        <form id="tour-guide-delete-form" method="post" style="display:none;">
+            <?php wp_nonce_field( 'tour_guide_templates' ); ?>
+            <input type="hidden" name="tour_guide_action" value="delete_template" />
+            <input type="hidden" name="template_id" id="tour-guide-delete-id" value="" />
+        </form>
+        
+        <!-- Formulaire caché pour l'export -->
+        <form id="tour-guide-export-form" method="post" style="display:none;">
+            <?php wp_nonce_field( 'tour_guide_templates' ); ?>
+            <input type="hidden" name="tour_guide_action" value="export_template" />
+            <input type="hidden" name="template_id" id="tour-guide-export-id" value="" />
+        </form>
+        
+        <script>
+        document.addEventListener('DOMContentLoaded', function(){
+            var delBtns = document.querySelectorAll('.tour-guide-delete-btn');
+            delBtns.forEach(function(btn){
+                btn.addEventListener('click', function(e){
+                    e.preventDefault();
+                    if(confirm('<?php echo esc_js( __( 'Êtes-vous sûr de vouloir supprimer ce template ?', 'tour-guide' ) ); ?>')){
+                        document.getElementById('tour-guide-delete-id').value = btn.getAttribute('data-id');
+                        document.getElementById('tour-guide-delete-form').submit();
+                    }
+                });
+            });
+            
+            var expBtns = document.querySelectorAll('.tour-guide-export-btn');
+            expBtns.forEach(function(btn){
+                btn.addEventListener('click', function(e){
+                    e.preventDefault();
+                    document.getElementById('tour-guide-export-id').value = btn.getAttribute('data-id');
+                    document.getElementById('tour-guide-export-form').submit();
+                });
+            });
+        });
+        </script>
 
         <h2><?php echo esc_html__( 'Importer un template (XML)', 'tour-guide' ); ?></h2>
         <form method="post" enctype="multipart/form-data">
@@ -531,6 +656,7 @@ function tour_guide_load_template_for_edit( $internal_id ) {
 
             // Récupérer l’attribut id et le contexte du template depuis le XML
             $attr_id = '';
+            $page_start = '';
             $context = isset( $tpl['context'] ) ? $tpl['context'] : 'all';
             if ( function_exists( 'simplexml_load_file' ) ) {
                 $xml = @simplexml_load_file( $path );
@@ -541,6 +667,9 @@ function tour_guide_load_template_for_edit( $internal_id ) {
                     if ( isset( $xml['context'] ) ) {
                         $context = (string) $xml['context'];
                     }
+                    if ( isset( $xml['page_start'] ) ) {
+                        $page_start = (string) $xml['page_start'];
+                    }
                 }
             }
 
@@ -549,6 +678,7 @@ function tour_guide_load_template_for_edit( $internal_id ) {
                 'file'    => $tpl['file'],
                 'title'   => $tpl['title'],
                 'attr_id' => $attr_id,
+                'page_start' => $page_start,
                 'context' => $context,
                 'steps'   => $steps,
             );
@@ -560,6 +690,7 @@ function tour_guide_load_template_for_edit( $internal_id ) {
 // Gérer la sauvegarde d’un template à partir du formulaire
 function tour_guide_handle_save_template_post() {
     $attr_id = isset( $_POST['template_attr_id'] ) ? sanitize_text_field( wp_unslash( $_POST['template_attr_id'] ) ) : '';
+    $page_start = isset( $_POST['template_page_start'] ) ? sanitize_text_field( wp_unslash( $_POST['template_page_start'] ) ) : '';
     $title   = isset( $_POST['template_title'] ) ? sanitize_text_field( wp_unslash( $_POST['template_title'] ) ) : '';
     $path    = isset( $_POST['template_path'] ) ? wp_unslash( $_POST['template_path'] ) : '';
     $context = isset( $_POST['template_context'] ) ? sanitize_text_field( wp_unslash( $_POST['template_context'] ) ) : 'all';
@@ -671,7 +802,7 @@ function tour_guide_handle_save_template_post() {
         );
     }
 
-    $xml = tour_guide_build_template_xml( $attr_id, $title, $steps, $context );
+    $xml = tour_guide_build_template_xml( $attr_id, $title, $steps, $context, $page_start );
 
     // Si pas de chemin existant, on choisit le dossier selon le stockage
     if ( empty( $path ) ) {
@@ -706,10 +837,69 @@ function tour_guide_handle_save_template_post() {
         );
     }
 
+    // Mise à jour automatique de la disponibilité si nouveau
+    // On recharge les templates pour récupérer le nouvel ID généré via md5(source|title)
+    // Note: $path est soit dans uploads (source='upload') soit plugin (source='plugin')
+    $source = ( strpos( $path, tour_guide_get_upload_dir() ) === 0 ) ? 'upload' : 'plugin';
+    // Le titre est basename(path)
+    $file_basename = basename( $path );
+    $new_id = md5( $source . '|' . $file_basename );
+    
+    $active = tour_guide_get_active_templates();
+    if ( ! isset( $active[ $new_id ] ) ) {
+        $active[ $new_id ] = 'menu';
+        update_option( 'tour_guide_active_templates', $active );
+    }
+
     return array(
         'success' => true,
         'message' => __( 'Template enregistré.', 'tour-guide' ),
     );
+}
+
+function tour_guide_delete_template( $id ) {
+    $templates = tour_guide_list_all_templates();
+    foreach ( $templates as $tpl ) {
+        if ( $tpl['id'] === $id ) {
+            // Vérification : suppression autorisée uniquement pour upload
+            if ( $tpl['source'] !== 'upload' ) {
+                return false;
+            }
+            
+            if ( file_exists( $tpl['path'] ) ) {
+                if ( unlink( $tpl['path'] ) ) {
+                    // Nettoyer l'option d'activation
+                    $active = tour_guide_get_active_templates();
+                    if ( isset( $active[ $id ] ) ) {
+                        unset( $active[ $id ] );
+                        update_option( 'tour_guide_active_templates', $active );
+                    }
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function tour_guide_export_template( $id ) {
+    $templates = tour_guide_list_all_templates();
+    foreach ( $templates as $tpl ) {
+        if ( $tpl['id'] === $id ) {
+            if ( file_exists( $tpl['path'] ) ) {
+                $filename = basename( $tpl['path'] );
+                header( 'Content-Description: File Transfer' );
+                header( 'Content-Type: application/xml' );
+                header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+                header( 'Expires: 0' );
+                header( 'Cache-Control: must-revalidate' );
+                header( 'Pragma: public' );
+                header( 'Content-Length: ' . filesize( $tpl['path'] ) );
+                readfile( $tpl['path'] );
+                exit;
+            }
+        }
+    }
 }
 
 // Helper pour échapper les attributs XML
@@ -718,13 +908,14 @@ function tour_guide_esc_xml( $text ) {
 }
 
 // Construire le XML d’un template à partir de données de formulaire
-function tour_guide_build_template_xml( $attr_id, $title, $steps, $context = 'all' ) {
+function tour_guide_build_template_xml( $attr_id, $title, $steps, $context = 'all', $page_start = '' ) {
     $attr_id_esc = tour_guide_esc_xml( $attr_id );
     $title_esc   = tour_guide_esc_xml( $title );
     $context_esc = tour_guide_esc_xml( $context );
+    $page_start_esc = tour_guide_esc_xml( $page_start );
 
     $xml  = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-    $xml .= '<template id="' . $attr_id_esc . '" title="' . $title_esc . '" context="' . $context_esc . '">' . "\n";
+    $xml .= '<template id="' . $attr_id_esc . '" title="' . $title_esc . '" context="' . $context_esc . '" page_start="' . $page_start_esc . '">' . "\n";
     $xml .= "  <steps>\n";
     foreach ( $steps as $step ) {
         $step_type = isset( $step['type'] ) ? $step['type'] : 'step';
@@ -811,6 +1002,7 @@ function tour_guide_parse_template_meta( $filepath, $source ) {
 	$id      = md5( $source . '|' . $title );
 	$context = 'all';
 	$attr_id = '';
+	$page_start = '';
 
 	// Essayer d’extraire un titre depuis le XML: <template id="..." title="..." context="...">
 	$content = @file_get_contents( $filepath );
@@ -827,11 +1019,16 @@ function tour_guide_parse_template_meta( $filepath, $source ) {
 		if ( preg_match( '/<template[^>]*id="([^"]+)"/i', $content, $m3 ) ) {
 			$attr_id = wp_strip_all_tags( $m3[1] );
 		}
+		// Extraction de l’attribut page_start éventuel
+		if ( preg_match( '/<template[^>]*page_start="([^"]+)"/i', $content, $m4 ) ) {
+			$page_start = wp_strip_all_tags( $m4[1] );
+		}
 	}
 
 	return array(
 		'id'      => $id,
 		'attr_id' => $attr_id,
+		'page_start' => $page_start,
 		'file'    => basename( $filepath ),
 		'path'    => $filepath,
 		'title'   => $title,
@@ -875,6 +1072,7 @@ function tour_guide_get_tours_by_template( $active_only = true, $context_filter 
                 $tours[] = array(
                     'id'     => $tpl['id'],
                     'xml_id' => isset( $tpl['attr_id'] ) ? $tpl['attr_id'] : '',
+                    'page_start' => isset( $tpl['page_start'] ) ? $tpl['page_start'] : '',
                     'title'  => $tpl['title'],
                     'steps'  => $tpl_steps,
                     'status' => isset( $tpl['status'] ) ? $tpl['status'] : 'menu',
@@ -895,6 +1093,7 @@ function tour_guide_get_tours_by_template( $active_only = true, $context_filter 
                 $tours[] = array(
                     'id'     => $tpl['id'],
                     'xml_id' => isset( $tpl['attr_id'] ) ? $tpl['attr_id'] : '',
+                    'page_start' => isset( $tpl['page_start'] ) ? $tpl['page_start'] : '',
                     'title'  => $tpl['title'],
                     'steps'  => $tpl_steps,
                     'status' => 'menu', // Par défaut pour les non actifs
