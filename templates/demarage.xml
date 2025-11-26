@@ -1,23 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<template id="demarrage" title="Démarrage" context="admin">
+<template id="demarrage" title="Démarrage" context="admin" page_start="">
   <steps>
-    <step selector="#menu-appearance" position="top">
-      <title>Modification du menu</title>
-      <description>Sélectionnez le menu à modifier
-&lt;p&gt;Gérer les menus : 
-&lt;a href =&quot;/wp-admin/site-editor.php&quot;&gt;Apparence&lt;/a&gt; &gt; &lt;a href=&quot;/wp-admin/site-editor.php?p=%2Fnavigation&quot;&gt;Navigation&lt;/a&gt;
-&lt;/p&gt;
-&lt;p&gt;
-&lt;a href =&quot;/wp-admin/site-editor.php?p=%2Fwp_navigation%2F4&quot;&gt;Modifier le menu principal&lt;/a&gt;
-&lt;/p&gt;</description>
+    <step selector="#menu-pages" position="right">
+      <title>Gestion des pages</title>
+      <description><![CDATA[<p>Modification et ajout de pages</p>]]></description>
       <action>none</action>
       <wait_timeout>0</wait_timeout>
       <delay_ms>0</delay_ms>
       <resume>none</resume>
     </step>
-    <step selector="#menu-pages" position="right">
-      <title>Gestion des pages</title>
-      <description>Modification et ajout de pages</description>
+    <step selector="#menu-media" position="right">
+      <title>Gestion des Médias</title>
+      <description><![CDATA[<p>Lister tous les médias disponibles dans votre bibliothèque.</p>
+<p>Ajouter de nouveaux médias (images, vidéos, etc.) en respectant les contraintes de taille et de résolution.</p>
+<p>Supprimer les médias obsolètes ou inutiles pour optimiser l'espace et les performances.</p>]]></description>
+      <action>none</action>
+      <wait_timeout>0</wait_timeout>
+      <delay_ms>0</delay_ms>
+      <resume>none</resume>
+    </step>
+    <step selector="#menu-appearance" position="top">
+      <title>Modification du menu</title>
+      <description><![CDATA[<p>Sélectionnez le menu à modifier</p>
+<p>Gérer les menus :</p>
+<a href ="/wp-admin/site-editor.php">Apparence</a> > <a href="/wp-admin/site-editor.php?p=%2Fnavigation">Navigation</a>
+<a href ="/wp-admin/site-editor.php?p=%2Fwp_navigation%2F4">Modifier le menu principal</a>]]></description>
       <action>none</action>
       <wait_timeout>0</wait_timeout>
       <delay_ms>0</delay_ms>
@@ -25,7 +32,7 @@
     </step>
     <step selector="#menu-posts-collection" position="top">
       <title>Gestion des collections</title>
-      <description>Modification et ajout de collections</description>
+      <description><![CDATA[<p>Modification et ajout de collections</p>]]></description>
       <action>none</action>
       <wait_timeout>0</wait_timeout>
       <delay_ms>0</delay_ms>
@@ -33,7 +40,7 @@
     </step>
     <step selector="#menu-posts-collection [href=&quot;edit-tags.php?taxonomy=categorie&amp;post_type=collection&quot;]" position="top">
       <title>Catégories de collections</title>
-      <description></description>
+      <description><![CDATA[]]></description>
       <action>none</action>
       <wait_timeout>0</wait_timeout>
       <delay_ms>0</delay_ms>

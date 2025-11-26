@@ -128,18 +128,100 @@
     }
   }
 
+  // Logique globale d'ouverture de menu et croix de fermeture
+  function handleHighlightStarted(element, step, driver){
+    try {
+      closeAllTourMenus();
+      openMenuForStep(step || null, element || null);
+      ensurePopoverCloseCross(driver);
+    } catch(e){
+      console.warn('[TG] Erreur handleHighlightStarted:', e);
+    }
+  }
+
+  // Injecter la logique d'orchestration (actions, navigation) dans les étapes
+  function injectOrchestration(steps, driver){
+    if (!Array.isArray(steps)) return [];
+    return steps.map(function(step){
+      // Copie superficielle pour ne pas muter l'objet original globalement
+      var s = Object.assign({}, step);
+      var orch = s.orchestrate || {};
+      
+      // Fonction pour exécuter l'action configurée
+      var performAction = function(){
+        // 1. Action Click
+        if (orch.action === 'click' && orch.action_selector){
+          try {
+            var target = document.querySelector(orch.action_selector);
+            if (target){
+              console.log('[TG] Action Click sur:', orch.action_selector);
+              // Simulation complète des événements souris
+              ['mousedown', 'mouseup', 'click'].forEach(function(type){
+                var evt = new MouseEvent(type, { bubbles: true, cancelable: true, view: window });
+                target.dispatchEvent(evt);
+              });
+              // Force le click natif (important pour les liens <a>)
+              if (typeof target.click === 'function') {
+                target.click();
+              }
+            } else {
+              console.warn('[TG] Cible action introuvable:', orch.action_selector);
+            }
+          } catch(e){
+            console.warn('[TG] Erreur action click:', e);
+          }
+        }
+        // 2. Navigation directe
+        if (orch.navigate_to){
+          console.log('[TG] Navigation vers:', orch.navigate_to);
+          window.location.href = orch.navigate_to;
+        }
+      };
+
+      // Détecter si c'est une "Action" pure (sans titre ni description)
+      // Dans ce cas, on l'exécute automatiquement au démarrage de l'étape
+      var isActionStep = (!s.popover || (!s.popover.title && !s.popover.description));
+
+      if (isActionStep) {
+        s.onHighlightStarted = function(el, stepObj, options){
+          // Exécuter la logique globale d'abord
+          handleHighlightStarted(el, stepObj, driver);
+          
+          // Puis l'action avec un petit délai pour laisser le highlight se faire
+          var delay = orch.delay_ms ? parseInt(orch.delay_ms) : 100;
+          setTimeout(function(){
+            performAction();
+            // Passer à la suite automatiquement si l'action ne change pas de page
+            if (driver && typeof driver.moveNext === 'function'){
+              driver.moveNext();
+            }
+          }, delay);
+        };
+      } else {
+        // C'est un Popup : l'action se fait au clic sur "Suivant"
+        s.onNextClick = function(el, activeStep, state){
+          performAction();
+          
+          // Passer à l'étape suivante
+          if (state && typeof state.moveNext === 'function'){
+            state.moveNext();
+          } else if (driver && typeof driver.moveNext === 'function'){
+            driver.moveNext();
+          }
+        };
+      }
+      
+      return s;
+    });
+  }
+
   function startTour(steps, tourId){
     console.log('[Tour Guide Admin] startTour called, tourId:', tourId, 'steps:', Array.isArray(steps)?steps.length:'?');
 
     var hooks = {
       onHighlightStarted: function(element, step, options){
-        try {
-          closeAllTourMenus();
-          openMenuForStep(step || null, element || null);
-          ensurePopoverCloseCross(driver);
-        } catch(e){
-          console.warn('[TG] Erreur onHighlightStarted:', e);
-        }
+        // Hook global (utilisé si l'étape n'a pas son propre handler)
+        handleHighlightStarted(element, step, driver);
       },
       onDestroyStarted: function(){
         // Quand le tour se termine, fermer tous les menus ouverts
@@ -164,6 +246,9 @@
     }, hooks));
     if (!driver) { console.warn('[Tour Guide Admin] Driver introuvable'); return; }
 
+    // Injecter la logique d'action/navigation dans les étapes
+    var processedSteps = injectOrchestration(steps || [], driver);
+
     try{
       if (typeof driver.setConfig==='function'){
         driver.setConfig(Object.assign({ 
@@ -177,11 +262,11 @@
         }, hooks));
       }
       if (typeof driver.defineSteps==='function' && typeof driver.start==='function'){
-        driver.defineSteps(steps||[]);
+        driver.defineSteps(processedSteps);
         driver.start();
         console.log('[TG Admin] Tour démarré (ancienne API)');
       } else if (typeof driver.setSteps==='function' && typeof driver.drive==='function'){
-        driver.setSteps(steps||[]);
+        driver.setSteps(processedSteps);
         driver.drive();
         console.log('[TG Admin] Tour démarré (nouvelle API)');
       } else {
@@ -416,6 +501,17 @@
     })();
 
     // Gestion visibilité selon le type (popup / action / include)
+    function setCellContentVisibility(cell, visible) {
+      if (!cell) return;
+      // On cache/affiche les éléments enfants pour ne pas casser la structure du tableau
+      var children = cell.children;
+      for (var i = 0; i < children.length; i++) {
+        children[i].style.display = visible ? '' : 'none';
+      }
+      // Optionnel: griser la cellule si vide
+      cell.style.backgroundColor = visible ? '' : '#f6f7f7';
+    }
+
     function applyTypeVisibilityForRow(tr){
       if (!tr) return;
       var typeSel = tr.querySelector('select.tg-step-type');
@@ -426,7 +522,7 @@
       var isPopup = type === 'popup';
       var isAction = type === 'action';
       
-      // Colonnes communes à popup et action (toujours visibles sauf pour include)
+      // Colonnes communes (Sélecteur, Titre, Desc, Position)
       var commonCols = [
         tr.querySelector('.tg-sec-selector'),
         tr.querySelector('.tg-sec-title'),
@@ -434,7 +530,7 @@
         tr.querySelector('.tg-sec-position')
       ];
       
-      // Colonnes uniquement pour action
+      // Colonnes d'action (Action, Wait, Resume)
       var actionOnlyCols = [
         tr.querySelector('.tg-sec-action'),
         tr.querySelector('.tg-sec-wait'),
@@ -443,33 +539,24 @@
       
       var includeCol = tr.querySelector('.tg-sec-include');
       
-      // Afficher les colonnes communes sauf si include
-      commonCols.forEach(function(col){ 
-        if (!col) return;
-        if (isInclude) {
-          col.style.setProperty('display', 'none', 'important');
-        } else {
-          col.style.setProperty('display', 'table-cell', 'important');
-        }
-      });
-      
-      // Afficher les colonnes d'action seulement si type=action
-      actionOnlyCols.forEach(function(col){ 
-        if (!col) return;
-        if (isAction) {
-          col.style.setProperty('display', 'table-cell', 'important');
-        } else {
-          col.style.setProperty('display', 'none', 'important');
-        }
-      });
-      
-      // Afficher la colonne include seulement si type=include
-      if (includeCol) {
-        if (isInclude) {
-          includeCol.style.setProperty('display', 'table-cell', 'important');
-        } else {
-          includeCol.style.setProperty('display', 'none', 'important');
-        }
+      if (isInclude) {
+        // Include: Seul le champ include est visible
+        commonCols.forEach(function(col){ setCellContentVisibility(col, false); });
+        actionOnlyCols.forEach(function(col){ setCellContentVisibility(col, false); });
+        setCellContentVisibility(includeCol, true);
+      } else if (isAction) {
+        // Action: On cache Titre/Desc/Pos (inutile pour une action invisible)
+        // On garde le selecteur principal ou on le cache ? Le user dit "ça ne devrait pas y figurer".
+        // Comme il y a un "Sélecteur pour l'action" spécifique, on peut cacher le sélecteur principal.
+        commonCols.forEach(function(col){ setCellContentVisibility(col, false); });
+        actionOnlyCols.forEach(function(col){ setCellContentVisibility(col, true); });
+        setCellContentVisibility(includeCol, false);
+      } else {
+        // Popup: Tout est visible (Sauf include)
+        // On permet désormais d'ajouter une Action à une Popup !
+        commonCols.forEach(function(col){ setCellContentVisibility(col, true); });
+        actionOnlyCols.forEach(function(col){ setCellContentVisibility(col, true); });
+        setCellContentVisibility(includeCol, false);
       }
     }
     
@@ -614,6 +701,22 @@
       var tbody = table.querySelector('tbody');
       if (!tbody) return;
       var $tbody = $(tbody);
+      
+      // Fonction pour mettre à jour l'input caché avec l'ordre actuel
+      function updateOrderInput() {
+        var order = [];
+        $tbody.find('tr').each(function() {
+            var id = $(this).attr('data-id');
+            if (id) {
+                order.push(id);
+            }
+        });
+        var input = document.getElementById('active_tours_order');
+        if (input) {
+            input.value = order.join(',');
+        }
+      }
+
       $tbody.sortable({
         items: '> tr',
         axis: 'y',
@@ -622,8 +725,14 @@
           return ui;
         },
         placeholder: 'tg-sort-placeholder',
-        forcePlaceholderSize: true
+        forcePlaceholderSize: true,
+        update: function(event, ui) {
+            updateOrderInput();
+        }
       });
+      
+      // Initialiser l'ordre au chargement aussi (pour être sûr)
+      updateOrderInput();
     })();
 
     // Délégation pour Dupliquer/Supprimer/Tester
