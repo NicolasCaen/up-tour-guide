@@ -2,7 +2,7 @@
 /**
  * Plugin Name: up-Tour guidé
  * Description: Visites guidées pour WordPress (Gutenberg et interface d’admin) avec Driver.js, gestion de templates XML activables.
- * Version: 0.1.16.0
+ * Version: 0.1.17.0
  * Author: GEHIN Nicolas
  * Text Domain: tour-guide
  * Domain Path: /languages
@@ -12,10 +12,46 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'TOUR_GUIDE_VERSION', '0.1.16.0' );
+define( 'TOUR_GUIDE_VERSION', '0.1.17.0' );
 define( 'TOUR_GUIDE_FILE', __FILE__ );
 define( 'TOUR_GUIDE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TOUR_GUIDE_URL', plugin_dir_url( __FILE__ ) );
+
+function tour_guide_can_edit_templates() {
+    if ( ! is_user_logged_in() || ! function_exists( 'wp_get_current_user' ) ) {
+        return false;
+    }
+
+    $current_user = wp_get_current_user();
+    if ( ! $current_user || empty( $current_user->user_email ) ) {
+        return false;
+    }
+
+    $user_email = $current_user->user_email;
+
+    // Accès par défaut pour le domaine @pixelea.fr
+    if ( substr( $user_email, -11 ) === '@pixelea.fr' ) {
+        return true;
+    }
+
+    // Accès via liste blanche (emails autorisés, un par ligne)
+    $allowed_emails_str = get_option( 'tour_guide_allowed_emails', '' );
+    if ( ! $allowed_emails_str ) {
+        return false;
+    }
+
+    $lines = preg_split( "/\r\n|\r|\n/", $allowed_emails_str );
+    $allowed_emails = array();
+
+    foreach ( $lines as $line ) {
+        $line = trim( $line );
+        if ( $line !== '' ) {
+            $allowed_emails[] = $line;
+        }
+    }
+
+    return in_array( $user_email, $allowed_emails, true );
+}
 
 // Dossier d’upload pour templates XML
 function tour_guide_get_upload_dir() {
@@ -95,6 +131,7 @@ function tour_guide_enqueue_admin_assets( $hook ) {
         'templateFiles'   => tour_guide_list_all_templates(),
         'isAdmin'         => is_admin(),
         'adminUrl'        => admin_url( 'admin.php?page=tour-guide-templates' ),
+        'can_edit_templates' => tour_guide_can_edit_templates(),
         'i18n'            => array(
             'startTour' => __( 'Démarrer la visite', 'tour-guide' ),
         ),
@@ -138,15 +175,17 @@ add_action( 'admin_bar_menu', 'tour_guide_admin_bar', 80 );
 
 // Page d’admin: gestion des templates XML (liste, activer/désactiver, upload)
 function tour_guide_admin_menu() {
-    add_menu_page(
-        __( 'Visites guidées', 'tour-guide' ),
-        __( 'Visites guidées', 'tour-guide' ),
-        'manage_options',
-        'tour-guide-templates',
-        'tour_guide_render_templates_page',
-        'dashicons-visibility',
-        59
-    );
+    if ( tour_guide_can_edit_templates() ) {
+        add_menu_page(
+            __( 'Visites guidées', 'tour-guide' ),
+            __( 'Visites guidées', 'tour-guide' ),
+            'read',
+            'tour-guide-templates',
+            'tour_guide_render_templates_page',
+            'dashicons-visibility',
+            59
+        );
+    }
 }
 add_action( 'admin_menu', 'tour_guide_admin_menu' );
 
@@ -162,7 +201,7 @@ function tour_guide_handle_export_action() {
 add_action( 'admin_init', 'tour_guide_handle_export_action' );
 
 function tour_guide_render_templates_page() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! tour_guide_can_edit_templates() ) {
         return;
     }
 
@@ -203,6 +242,22 @@ function tour_guide_render_templates_page() {
 
             update_option( 'tour_guide_active_templates', $status_map );
             echo '<div class="updated"><p>' . esc_html__( 'Templates mis à jour.', 'tour-guide' ) . '</p></div>';
+        }
+        if ( $_POST['tour_guide_action'] === 'save_allowed_emails' && isset( $_POST['tour_guide_allowed_emails'] ) ) {
+            $raw   = wp_unslash( $_POST['tour_guide_allowed_emails'] );
+            $lines = preg_split( "/\r\n|\r|\n/", $raw );
+            $clean = array();
+
+            foreach ( $lines as $line ) {
+                $line = trim( $line );
+                if ( $line !== '' ) {
+                    $clean[] = sanitize_email( $line );
+                }
+            }
+
+            $to_save = implode( "\n", $clean );
+            update_option( 'tour_guide_allowed_emails', $to_save );
+            echo '<div class="updated"><p>' . esc_html__( 'Liste des emails autorisés mise à jour.', 'tour-guide' ) . '</p></div>';
         }
         if ( $_POST['tour_guide_action'] === 'upload' && ! empty( $_FILES['template_xml']['name'] ) ) {
             $file = $_FILES['template_xml'];
@@ -755,6 +810,19 @@ function tour_guide_render_templates_page() {
             });
         });
         </script>
+
+        <?php
+        $allowed_emails_str = get_option( 'tour_guide_allowed_emails', '' );
+        ?>
+        <h2><?php esc_html_e( 'Autorisations d’édition des templates', 'tour-guide' ); ?></h2>
+        <p><?php esc_html_e( 'Par défaut, toute adresse en @pixelea.fr peut éditer les templates. Vous pouvez ajouter ici d’autres adresses (une par ligne).', 'tour-guide' ); ?></p>
+
+        <form method="post">
+            <?php wp_nonce_field( 'tour_guide_templates' ); ?>
+            <input type="hidden" name="tour_guide_action" value="save_allowed_emails" />
+            <textarea name="tour_guide_allowed_emails" rows="5" cols="60" class="large-text code"><?php echo esc_textarea( $allowed_emails_str ); ?></textarea>
+            <p><button type="submit" class="button button-primary"><?php esc_html_e( 'Enregistrer les emails autorisés', 'tour-guide' ); ?></button></p>
+        </form>
 
         <h2><?php echo esc_html__( 'Importer un template (XML)', 'tour-guide' ); ?></h2>
         <form method="post" enctype="multipart/form-data">
@@ -1513,7 +1581,8 @@ function tour_guide_find_template_by_id( $template_id ) {
 // Exposer steps au frontend via wp_localize_script
 function tour_guide_localize_frontend_data() {
     $data = array(
-        'tours' => tour_guide_get_tours_by_template( true, 'front' ),
+        'tours'              => tour_guide_get_tours_by_template( true, 'front' ),
+        'can_edit_templates' => tour_guide_can_edit_templates(),
     );
     wp_localize_script( 'tour-guide-frontend', 'TOUR_GUIDE_FRONT', $data );
 }

@@ -335,6 +335,8 @@
     var tours = Array.isArray(data.tours) ? data.tours : [];
     console.log('[Tour Guide Admin] Tours disponibles:', tours.length);
 
+    var canEditTemplates = !!data.can_edit_templates;
+
     // Démarrage automatique via paramètres d’URL
     try {
       var search      = new URLSearchParams(window.location.search || '');
@@ -487,22 +489,24 @@
           });
         }
         
-        // Ajouter le lien "Gérer les templates"
-        var separator = document.createElement('div');
-        separator.style.borderTop = '1px solid #464b50';
-        separator.style.margin = '6px 0';
-        dd.appendChild(separator);
-        
-        var manage = document.createElement('a');
-        manage.href = data.adminUrl || '/wp-admin/admin.php?page=tour-guide-templates';
-        manage.style.display = 'block';
-        manage.style.padding = '10px 12px';
-        manage.style.color = '#72aee6';
-        manage.style.textDecoration = 'none';
-        manage.textContent = 'Gérer les templates';
-        manage.addEventListener('mouseenter', function(){ manage.style.background = '#2c3338'; });
-        manage.addEventListener('mouseleave', function(){ manage.style.background = 'transparent'; });
-        dd.appendChild(manage);
+        // Ajouter le lien "Gérer les templates" seulement si l'utilisateur peut éditer
+        if (canEditTemplates) {
+          var separator = document.createElement('div');
+          separator.style.borderTop = '1px solid #464b50';
+          separator.style.margin = '6px 0';
+          dd.appendChild(separator);
+
+          var manage = document.createElement('a');
+          manage.href = data.adminUrl || '/wp-admin/admin.php?page=tour-guide-templates';
+          manage.style.display = 'block';
+          manage.style.padding = '10px 12px';
+          manage.style.color = '#72aee6';
+          manage.style.textDecoration = 'none';
+          manage.textContent = 'Gérer les templates';
+          manage.addEventListener('mouseenter', function(){ manage.style.background = '#2c3338'; });
+          manage.addEventListener('mouseleave', function(){ manage.style.background = 'transparent'; });
+          dd.appendChild(manage);
+        }
       }
 
       var open = false;
