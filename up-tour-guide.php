@@ -2,7 +2,7 @@
 /**
  * Plugin Name: up-Tour guidé
  * Description: Visites guidées pour WordPress (Gutenberg et interface d’admin) avec Driver.js, gestion de templates XML activables.
- * Version: 0.1.15.0
+ * Version: 0.1.16.0
  * Author: GEHIN Nicolas
  * Text Domain: tour-guide
  * Domain Path: /languages
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'TOUR_GUIDE_VERSION', '0.1.15.0' );
+define( 'TOUR_GUIDE_VERSION', '0.1.16.0' );
 define( 'TOUR_GUIDE_FILE', __FILE__ );
 define( 'TOUR_GUIDE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TOUR_GUIDE_URL', plugin_dir_url( __FILE__ ) );
@@ -110,6 +110,12 @@ function tour_guide_enqueue_front_assets() {
     wp_enqueue_style( 'driverjs-style' );
 
     wp_enqueue_script( 'tour-guide-frontend', TOUR_GUIDE_URL . 'assets/frontend.js', array( 'driverjs' ), null, true );
+
+    // Si la barre d’admin est affichée, charger le JS/CSS admin nécessaire pour le menu
+    if ( is_user_logged_in() && is_admin_bar_showing() ) {
+        wp_enqueue_script( 'tour-guide-admin-js', TOUR_GUIDE_URL . 'assets/admin.js', array( 'driverjs' ), null, true );
+        wp_enqueue_style( 'tour-guide-admin-css', TOUR_GUIDE_URL . 'assets/admin.css' );
+    }
 }
 add_action( 'wp_enqueue_scripts', 'tour_guide_enqueue_front_assets' );
 
@@ -176,7 +182,7 @@ function tour_guide_render_templates_page() {
             foreach ( $_POST['template_status'] as $id => $status ) {
                 $clean_id = sanitize_text_field( $id );
                 $clean_status = sanitize_key( $status );
-                if ( in_array( $clean_status, array( 'menu', 'url_only' ), true ) ) {
+                if ( in_array( $clean_status, array( 'menu', 'url_only', 'menu_front_url', 'menu_front' ), true ) ) {
                     $status_map[ $clean_id ] = $clean_status;
                 }
             }
@@ -289,9 +295,10 @@ function tour_guide_render_templates_page() {
                         <?php $current_type = $editing_template && isset( $editing_template['type'] ) ? $editing_template['type'] : 'tour'; ?>
                         <fieldset>
                             <label><input type="radio" name="template_type" value="tour" <?php checked( $current_type, 'tour' ); ?> /> <?php echo esc_html__( 'Visite guidée (Standard)', 'tour-guide' ); ?></label><br/>
-                            <label><input type="radio" name="template_type" value="module" <?php checked( $current_type, 'module' ); ?> /> <?php echo esc_html__( 'Module (Brique réutilisable)', 'tour-guide' ); ?></label>
+                            <label><input type="radio" name="template_type" value="module" <?php checked( $current_type, 'module' ); ?> /> <?php echo esc_html__( 'Module (Brique réutilisable)', 'tour-guide' ); ?></label><br/>
+                            <label><input type="radio" name="template_type" value="link" <?php checked( $current_type, 'link' ); ?> /> <?php echo esc_html__( 'Lien (entrée de menu personnalisée)', 'tour-guide' ); ?></label>
                         </fieldset>
-                        <p class="description"><?php echo esc_html__( 'Les modules sont pensés pour être inclus dans d\'autres visites et n\'apparaissent pas directement dans le menu principal.', 'tour-guide' ); ?></p>
+                        <p class="description"><?php echo esc_html__( 'Les modules sont pensés pour être inclus dans d\'autres visites et n\'apparaissent pas directement dans le menu principal. Les liens permettent d\'ajouter une entrée de menu qui ouvre simplement une URL.', 'tour-guide' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -307,6 +314,13 @@ function tour_guide_render_templates_page() {
                     <td>
                         <input name="template_page_start" id="template_page_start" type="text" class="regular-text" value="<?php echo $editing_template ? esc_attr( isset($editing_template['page_start']) ? $editing_template['page_start'] : '' ) : ''; ?>" placeholder="/ma-page.php" />
                         <p class="description"><?php echo esc_html__( 'Si renseigné, le lien dans le menu redirigera vers cette page avec ?visite=ID (ex: /admin.php -> /admin.php?visite=mon-id).', 'tour-guide' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="template_link_url"><?php echo esc_html__( 'URL (pour le type Lien)', 'tour-guide' ); ?></label></th>
+                    <td>
+                        <input name="template_link_url" id="template_link_url" type="text" class="regular-text" value="<?php echo $editing_template && isset( $editing_template['link_url'] ) ? esc_attr( $editing_template['link_url'] ) : ''; ?>" placeholder="https://example.com ou /wp-admin/..." />
+                        <p class="description"><?php echo esc_html__( 'Utilisé uniquement si le type de template est "Lien". L’URL est utilisée telle quelle (absolue ou relative).', 'tour-guide' ); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -365,6 +379,7 @@ function tour_guide_render_templates_page() {
                 </tr>
             </table>
 
+            <div id="tour-guide-steps-wrapper">
             <h3><?php echo esc_html__( 'Étapes de la visite', 'tour-guide' ); ?></h3>
             <p class="description"><?php echo esc_html__( 'Définissez les sélecteurs CSS, titres, descriptions et positions des bulles Driver.js.', 'tour-guide' ); ?></p>
             <table class="widefat fixed" style="max-width: 1000px;" id="tour-guide-steps-table">
@@ -572,6 +587,7 @@ function tour_guide_render_templates_page() {
             </table>
 
             <p><button type="button" class="button" id="tour-guide-add-step"><?php echo esc_html__( 'Ajouter une étape', 'tour-guide' ); ?></button></p>
+            </div><!-- /#tour-guide-steps-wrapper -->
 
             <p><button type="submit" class="button button-primary"><?php echo esc_html__( 'Enregistrer le template', 'tour-guide' ); ?></button></p>
         </form>
@@ -641,8 +657,10 @@ function tour_guide_render_templates_page() {
                                 <td>
                                     <select name="template_status[<?php echo esc_attr( $tpl['id'] ); ?>]" style="width: 100%;">
                                         <option value="disabled" <?php selected( $current_status, 'disabled' ); ?>><?php echo esc_html__( 'Désactivé', 'tour-guide' ); ?></option>
-                                        <option value="menu" <?php selected( $current_status, 'menu' ); ?>><?php echo esc_html__( 'Menu + URL', 'tour-guide' ); ?></option>
+                                        <option value="menu" <?php selected( $current_status, 'menu' ); ?>><?php echo esc_html__( 'Menu (admin) + URL', 'tour-guide' ); ?></option>
                                         <option value="url_only" <?php selected( $current_status, 'url_only' ); ?>><?php echo esc_html__( 'URL uniquement', 'tour-guide' ); ?></option>
+                                        <option value="menu_front_url" <?php selected( $current_status, 'menu_front_url' ); ?>><?php echo esc_html__( 'Menu admin + front + URL', 'tour-guide' ); ?></option>
+                                        <option value="menu_front" <?php selected( $current_status, 'menu_front' ); ?>><?php echo esc_html__( 'Menu front uniquement', 'tour-guide' ); ?></option>
                                     </select>
                                 </td>
                                 <td><strong><?php echo esc_html( $tpl['title'] ); ?></strong></td>
@@ -856,6 +874,7 @@ function tour_guide_load_template_for_edit( $internal_id ) {
             // Récupérer l’attribut id et le contexte du template depuis le XML
             $attr_id = '';
             $page_start = '';
+            $link_url = '';
             $context = isset( $tpl['context'] ) ? $tpl['context'] : 'all';
             $type = 'tour';
             if ( function_exists( 'simplexml_load_file' ) ) {
@@ -873,6 +892,9 @@ function tour_guide_load_template_for_edit( $internal_id ) {
                     if ( isset( $xml['type'] ) ) {
                         $type = (string) $xml['type'];
                     }
+                    if ( isset( $xml['link_url'] ) ) {
+                        $link_url = (string) $xml['link_url'];
+                    }
                 }
             }
 
@@ -882,6 +904,7 @@ function tour_guide_load_template_for_edit( $internal_id ) {
                 'title'   => $tpl['title'],
                 'attr_id' => $attr_id,
                 'page_start' => $page_start,
+                'link_url' => $link_url,
                 'context' => $context,
                 'type'    => $type,
                 'steps'   => $steps,
@@ -895,6 +918,7 @@ function tour_guide_load_template_for_edit( $internal_id ) {
 function tour_guide_handle_save_template_post() {
     $attr_id = isset( $_POST['template_attr_id'] ) ? sanitize_text_field( wp_unslash( $_POST['template_attr_id'] ) ) : '';
     $page_start = isset( $_POST['template_page_start'] ) ? sanitize_text_field( wp_unslash( $_POST['template_page_start'] ) ) : '';
+    $link_url = isset( $_POST['template_link_url'] ) ? wp_unslash( $_POST['template_link_url'] ) : '';
     $title   = isset( $_POST['template_title'] ) ? sanitize_text_field( wp_unslash( $_POST['template_title'] ) ) : '';
     $path    = isset( $_POST['template_path'] ) ? wp_unslash( $_POST['template_path'] ) : '';
     $context = isset( $_POST['template_context'] ) ? sanitize_text_field( wp_unslash( $_POST['template_context'] ) ) : 'all';
@@ -1016,14 +1040,14 @@ function tour_guide_handle_save_template_post() {
         );
     }
 
-    if ( empty( $attr_id ) || empty( $title ) || empty( $steps ) ) {
+    if ( empty( $attr_id ) || empty( $title ) || ( $type !== 'link' && empty( $steps ) ) ) {
         return array(
             'success' => false,
-            'message' => __( 'Veuillez renseigner au minimum l’ID, le titre et une étape.', 'tour-guide' ),
+            'message' => __( 'Veuillez renseigner au minimum l’ID, le titre et une étape (sauf pour le type Lien).', 'tour-guide' ),
         );
     }
 
-    $xml = tour_guide_build_template_xml( $attr_id, $title, $steps, $context, $page_start, $type );
+    $xml = tour_guide_build_template_xml( $attr_id, $title, $steps, $context, $page_start, $type, $link_url );
 
     // Si pas de chemin existant, on choisit le dossier selon le stockage
     if ( empty( $path ) ) {
@@ -1129,15 +1153,16 @@ function tour_guide_esc_xml( $text ) {
 }
 
 // Construire le XML d’un template à partir de données de formulaire
-function tour_guide_build_template_xml( $attr_id, $title, $steps, $context = 'all', $page_start = '', $type = 'tour' ) {
+function tour_guide_build_template_xml( $attr_id, $title, $steps, $context = 'all', $page_start = '', $type = 'tour', $link_url = '' ) {
     $attr_id_esc = tour_guide_esc_xml( $attr_id );
     $title_esc   = tour_guide_esc_xml( $title );
     $context_esc = tour_guide_esc_xml( $context );
     $page_start_esc = tour_guide_esc_xml( $page_start );
     $type_esc = tour_guide_esc_xml( $type );
+    $link_url_esc = tour_guide_esc_xml( $link_url );
 
     $xml  = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-    $xml .= '<template id="' . $attr_id_esc . '" title="' . $title_esc . '" context="' . $context_esc . '" page_start="' . $page_start_esc . '" type="' . $type_esc . '">' . "\n";
+    $xml .= '<template id="' . $attr_id_esc . '" title="' . $title_esc . '" context="' . $context_esc . '" page_start="' . $page_start_esc . '" type="' . $type_esc . '" link_url="' . $link_url_esc . '">' . "\n";
     $xml .= "  <steps>\n";
     foreach ( $steps as $step ) {
         $step_type = isset( $step['type'] ) ? $step['type'] : 'step';
@@ -1225,46 +1250,51 @@ function tour_guide_parse_template_meta( $filepath, $source ) {
 	$context = 'all';
 	$attr_id = '';
 	$page_start = '';
-    $type = 'tour';
+	$link_url = '';
+	$type     = 'tour';
 
-	// Essayer d’extraire un titre depuis le XML: <template id="..." title="..." context="...">
+	// Essayer d’extraire les métadonnées depuis le XML: <template id="..." title="..." context="..." page_start="..." type="..." link_url="...">
 	$content = @file_get_contents( $filepath );
 	if ( $content ) {
-		// Simple extraction de l’attribut title
+		// title
 		if ( preg_match( '/<template[^>]*title="([^"]+)"/i', $content, $m ) ) {
 			$title = wp_strip_all_tags( $m[1] );
 		}
-		// Extraction de l’attribut context éventuel
+		// context
 		if ( preg_match( '/<template[^>]*context="([^"]+)"/i', $content, $m2 ) ) {
 			$context = sanitize_key( $m2[1] );
 		}
-		// Extraction de l’attribut id éventuel
+		// id
 		if ( preg_match( '/<template[^>]*id="([^"]+)"/i', $content, $m3 ) ) {
 			$attr_id = wp_strip_all_tags( $m3[1] );
 		}
-			// Extraction de l’attribut page_start éventuel
-			if ( preg_match( '/<template[^>]*page_start="([^"]+)"/i', $content, $m4 ) ) {
-				// Décoder les entités XML/HTML pour retrouver une URL exploitable (ex: &amp; -> &)
-				$page_start_raw = $m4[1];
-				$page_start_decoded = html_entity_decode( $page_start_raw, ENT_QUOTES, 'UTF-8' );
-				$page_start = wp_strip_all_tags( $page_start_decoded );
-			}
-        // Extraction de l’attribut type éventuel
+		// page_start
+		if ( preg_match( '/<template[^>]*page_start="([^"]+)"/i', $content, $m4 ) ) {
+			$page_start_raw     = $m4[1];
+			$page_start_decoded = html_entity_decode( $page_start_raw, ENT_QUOTES, 'UTF-8' );
+			$page_start         = wp_strip_all_tags( $page_start_decoded );
+		}
+		// type
 		if ( preg_match( '/<template[^>]*type="([^"]+)"/i', $content, $m5 ) ) {
 			$type = wp_strip_all_tags( $m5[1] );
+		}
+		// link_url (laisser tel quel, absolu ou relatif)
+		if ( preg_match( '/<template[^>]*link_url="([^"]*)"/i', $content, $m6 ) ) {
+			$link_url = wp_strip_all_tags( html_entity_decode( $m6[1], ENT_QUOTES, 'UTF-8' ) );
 		}
 	}
 
 	return array(
-		'id'      => $id,
-		'attr_id' => $attr_id,
+		'id'       => $id,
+		'attr_id'  => $attr_id,
 		'page_start' => $page_start,
-		'file'    => basename( $filepath ),
-		'path'    => $filepath,
-		'title'   => $title,
-		'source'  => $source,
-		'context' => $context,
-        'type'    => $type,
+		'file'     => basename( $filepath ),
+		'path'     => $filepath,
+		'title'    => $title,
+		'source'   => $source,
+		'context'  => $context,
+		'type'     => $type,
+		'link_url' => $link_url,
 	);
 }
 
@@ -1303,17 +1333,33 @@ function tour_guide_get_tours_by_template( $active_only = true, $context_filter 
                 }
             }
 
-            $tpl_steps = tour_guide_parse_template_steps( $tpl['path'] );
-            if ( ! empty( $tpl_steps ) ) {
-                $tours[] = array(
-                    'id'     => $tpl['id'],
-                    'xml_id' => isset( $tpl['attr_id'] ) ? $tpl['attr_id'] : '',
-                    'page_start' => isset( $tpl['page_start'] ) ? $tpl['page_start'] : '',
-                    'title'  => $tpl['title'],
-                    'type'   => isset( $tpl['type'] ) ? $tpl['type'] : 'tour',
-                    'steps'  => $tpl_steps,
-                    'status' => isset( $tpl['status'] ) ? $tpl['status'] : 'menu',
-                );
+            // Les templates de type "link" sont exposés en admin et en front (pour la barre admin)
+            if ( isset( $tpl['type'] ) && $tpl['type'] === 'link' ) {
+                if ( $context_filter === 'admin' || $context_filter === 'front' ) {
+                    $tours[] = array(
+                        'id'        => $tpl['id'],
+                        'xml_id'    => isset( $tpl['attr_id'] ) ? $tpl['attr_id'] : '',
+                        'page_start'=> isset( $tpl['page_start'] ) ? $tpl['page_start'] : '',
+                        'title'     => $tpl['title'],
+                        'type'      => 'link',
+                        'link_url'  => isset( $tpl['link_url'] ) ? $tpl['link_url'] : '',
+                        'steps'     => array(),
+                        'status'    => isset( $tpl['status'] ) ? $tpl['status'] : 'menu',
+                    );
+                }
+            } else {
+                $tpl_steps = tour_guide_parse_template_steps( $tpl['path'] );
+                if ( ! empty( $tpl_steps ) ) {
+                    $tours[] = array(
+                        'id'     => $tpl['id'],
+                        'xml_id' => isset( $tpl['attr_id'] ) ? $tpl['attr_id'] : '',
+                        'page_start' => isset( $tpl['page_start'] ) ? $tpl['page_start'] : '',
+                        'title'  => $tpl['title'],
+                        'type'   => isset( $tpl['type'] ) ? $tpl['type'] : 'tour',
+                        'steps'  => $tpl_steps,
+                        'status' => isset( $tpl['status'] ) ? $tpl['status'] : 'menu',
+                    );
+                }
             }
         }
     } else {
@@ -1325,17 +1371,32 @@ function tour_guide_get_tours_by_template( $active_only = true, $context_filter 
                     continue;
                 }
             }
-            $tpl_steps = tour_guide_parse_template_steps( $tpl['path'] );
-            if ( ! empty( $tpl_steps ) ) {
-                $tours[] = array(
-                    'id'     => $tpl['id'],
-                    'xml_id' => isset( $tpl['attr_id'] ) ? $tpl['attr_id'] : '',
-                    'page_start' => isset( $tpl['page_start'] ) ? $tpl['page_start'] : '',
-                    'title'  => $tpl['title'],
-                    'type'   => isset( $tpl['type'] ) ? $tpl['type'] : 'tour',
-                    'steps'  => $tpl_steps,
-                    'status' => 'menu', // Par défaut pour les non actifs
-                );
+            if ( isset( $tpl['type'] ) && $tpl['type'] === 'link' ) {
+                if ( $context_filter === 'admin' || $context_filter === 'front' ) {
+                    $tours[] = array(
+                        'id'        => $tpl['id'],
+                        'xml_id'    => isset( $tpl['attr_id'] ) ? $tpl['attr_id'] : '',
+                        'page_start'=> isset( $tpl['page_start'] ) ? $tpl['page_start'] : '',
+                        'title'     => $tpl['title'],
+                        'type'      => 'link',
+                        'link_url'  => isset( $tpl['link_url'] ) ? $tpl['link_url'] : '',
+                        'steps'     => array(),
+                        'status'    => 'menu',
+                    );
+                }
+            } else {
+                $tpl_steps = tour_guide_parse_template_steps( $tpl['path'] );
+                if ( ! empty( $tpl_steps ) ) {
+                    $tours[] = array(
+                        'id'     => $tpl['id'],
+                        'xml_id' => isset( $tpl['attr_id'] ) ? $tpl['attr_id'] : '',
+                        'page_start' => isset( $tpl['page_start'] ) ? $tpl['page_start'] : '',
+                        'title'  => $tpl['title'],
+                        'type'   => isset( $tpl['type'] ) ? $tpl['type'] : 'tour',
+                        'steps'  => $tpl_steps,
+                        'status' => 'menu', // Par défaut pour les non actifs
+                    );
+                }
             }
         }
     }

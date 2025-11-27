@@ -330,7 +330,8 @@
   }, true);
 
   document.addEventListener('DOMContentLoaded', function(){
-    var data = window.TOUR_GUIDE_DATA || {};
+    // Vérifier d'abord les données admin, sinon les données front
+    var data = window.TOUR_GUIDE_DATA || window.TOUR_GUIDE_FRONT || {};
     var tours = Array.isArray(data.tours) ? data.tours : [];
     console.log('[Tour Guide Admin] Tours disponibles:', tours.length);
 
@@ -363,6 +364,24 @@
     } catch(e) {
       console.warn('[Tour Guide Admin] Erreur lecture paramètres URL pour démarrage auto', e);
     }
+
+    // Masquer/afficher la table des étapes selon le type de template (tour/module vs link)
+    (function(){
+      var wrapper = document.getElementById('tour-guide-steps-wrapper');
+      var typeInputs = document.querySelectorAll('input[name="template_type"]');
+      if (!wrapper || !typeInputs.length) return;
+
+      function refreshStepsVisibility(){
+        var current = document.querySelector('input[name="template_type"]:checked');
+        var val = current ? current.value : 'tour';
+        wrapper.style.display = (val === 'link') ? 'none' : '';
+      }
+
+      typeInputs.forEach(function(r){
+        r.addEventListener('change', refreshStepsVisibility);
+      });
+      refreshStepsVisibility();
+    })();
 
     // Menu dropdown custom
     (function(){
@@ -404,8 +423,18 @@
       
       function renderItems(dd){
         dd.innerHTML = '';
-        // Filtrer uniquement les visites avec status === 'menu'
-        var menuTours = tours.filter(function(t){ return t.status === 'menu'; });
+        // Filtrer les visites selon le contexte (Admin ou Front)
+        var isAdmin = document.body.classList.contains('wp-admin');
+        
+        var menuTours = tours.filter(function(t){ 
+            if (isAdmin) {
+                // Back-office : voir 'menu' et 'menu_front_url'
+                return t.status === 'menu' || t.status === 'menu_front_url';
+            } else {
+                // Front-end : voir 'menu_front' et 'menu_front_url'
+                return t.status === 'menu_front' || t.status === 'menu_front_url';
+            }
+        });
         if (!menuTours.length){
           var empty = document.createElement('div');
           empty.textContent = 'Aucune visite disponible';
@@ -423,7 +452,14 @@
             a.addEventListener('mouseenter', function(){ a.style.background = '#2c3338'; });
             a.addEventListener('mouseleave', function(){ a.style.background = 'transparent'; });
 
-            if (t.page_start && t.page_start.trim() !== '') {
+            if (t.type === 'link' && t.link_url){
+              // Entrée de menu de type Lien : on ouvre directement l'URL telle quelle
+              a.href = t.link_url;
+              a.addEventListener('click', function(ev){
+                ev.stopPropagation();
+                hide();
+              });
+            } else if (t.page_start && t.page_start.trim() !== '') {
               // Lien vers une page spécifique avec ?visite=ID
               var sep = (t.page_start.indexOf('?') !== -1) ? '&' : '?';
               // Si t.xml_id est vide, on utilise t.id comme fallback ? Non, le XML id est préférable pour ?visite=
