@@ -580,8 +580,83 @@
       if (!tbody) return;
       Array.prototype.forEach.call(tbody.querySelectorAll('tr'), applyActionVisibilityForRow);
     }
+
+    // Outils pour l'insertion/copie de médias (vidéos / images) dans la description
+    function getVideoMime(url){
+      if (!url) return 'video/mp4';
+      var lower = String(url).toLowerCase();
+      if (lower.endsWith('.webm')) return 'video/webm';
+      if (lower.endsWith('.ogg') || lower.endsWith('.ogv')) return 'video/ogg';
+      return 'video/mp4';
+    }
+
+    function buildVideoCode(url){
+      if (!url) return '';
+      var type = getVideoMime(url);
+      return '<video controls width="350">\n' +
+             '  <source src="' + url + '" type="' + type + '" />\n' +
+             '</video>';
+    }
+
+    function buildImageCode(url){
+      if (!url) return '';
+      return '<img src="' + url + '" alt="" />';
+    }
+
+    function copyTextToClipboard(text){
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).catch(function(err){
+          console.warn('[Tour Guide Admin] Échec copy via clipboard API', err);
+        });
+        return;
+      }
+      try{
+        var ta = document.createElement('textarea');
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }catch(e){
+        console.warn('[Tour Guide Admin] Échec copy via execCommand', e);
+      }
+    }
+
+    function initMediaTools(){
+      var stepsTable = document.getElementById('tour-guide-steps-table');
+      if (!stepsTable) return;
+
+      stepsTable.addEventListener('click', function(e){
+        var videoBtn = e.target.closest && e.target.closest('.tg-video-copy-btn');
+        var imageBtn = e.target.closest && e.target.closest('.tg-image-copy-btn');
+        if (!videoBtn && !imageBtn) return;
+        e.preventDefault();
+
+        var tr = (videoBtn || imageBtn).closest('tr');
+        if (!tr) return;
+
+        if (videoBtn){
+          var vSel = tr.querySelector('select.tg-video-select');
+          if (!vSel || !vSel.value) return;
+          var vCode = buildVideoCode(vSel.value);
+          copyTextToClipboard(vCode);
+        }
+
+        if (imageBtn){
+          var iSel = tr.querySelector('select.tg-image-select');
+          if (!iSel || !iSel.value) return;
+          var iCode = buildImageCode(iSel.value);
+          copyTextToClipboard(iCode);
+        }
+      });
+    }
+
     applyTypeVisibilityAll();
     applyActionVisibilityAll();
+    initMediaTools();
     var stepsTable = document.getElementById('tour-guide-steps-table');
     stepsTable && stepsTable.addEventListener('change', function(e){
       if (e.target && e.target.name === 'step_action[]'){

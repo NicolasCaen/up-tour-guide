@@ -2,7 +2,7 @@
 /**
  * Plugin Name: up-Tour guidé
  * Description: Visites guidées pour WordPress (Gutenberg et interface d’admin) avec Driver.js, gestion de templates XML activables.
- * Version: 0.1.14.0
+ * Version: 0.1.15.0
  * Author: GEHIN Nicolas
  * Text Domain: tour-guide
  * Domain Path: /languages
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'TOUR_GUIDE_VERSION', '0.1.14.0' );
+define( 'TOUR_GUIDE_VERSION', '0.1.15.0' );
 define( 'TOUR_GUIDE_FILE', __FILE__ );
 define( 'TOUR_GUIDE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TOUR_GUIDE_URL', plugin_dir_url( __FILE__ ) );
@@ -27,6 +27,19 @@ function tour_guide_get_upload_dir() {
 function tour_guide_get_upload_url() {
     $uploads = wp_upload_dir();
     $url = trailingslashit( $uploads['baseurl'] ) . 'tour-guide/templates/';
+    return $url;
+}
+
+// Dossier d’upload pour médias (vidéos / images) utilisés dans les descriptions
+function tour_guide_get_media_dir() {
+    $uploads = wp_upload_dir();
+    $dir = trailingslashit( $uploads['basedir'] ) . 'tour-guide/media/';
+    return $dir;
+}
+
+function tour_guide_get_media_url() {
+    $uploads = wp_upload_dir();
+    $url = trailingslashit( $uploads['baseurl'] ) . 'tour-guide/media/';
     return $url;
 }
 
@@ -201,6 +214,34 @@ function tour_guide_render_templates_page() {
                 echo '<div class="error"><p>' . esc_html__( 'Fichier non valide (XML requis).', 'tour-guide' ) . '</p></div>';
             }
         }
+        if ( $_POST['tour_guide_action'] === 'upload_media' && ! empty( $_FILES['tour_guide_media']['name'] ) ) {
+            $file = $_FILES['tour_guide_media'];
+            // Autoriser quelques types d’images et de vidéos courants
+            $allowed_types = array(
+                'jpg'  => 'image/jpeg',
+                'jpeg' => 'image/jpeg',
+                'png'  => 'image/png',
+                'gif'  => 'image/gif',
+                'webp' => 'image/webp',
+                'mp4'  => 'video/mp4',
+                'webm' => 'video/webm',
+                'ogg'  => 'video/ogg',
+            );
+            $check = wp_check_filetype( $file['name'], $allowed_types );
+            if ( $check['ext'] && $check['type'] ) {
+                $dest_dir = tour_guide_get_media_dir();
+                if ( ! file_exists( $dest_dir ) ) { wp_mkdir_p( $dest_dir ); }
+                $safe_name = sanitize_file_name( $file['name'] );
+                $dest = trailingslashit( $dest_dir ) . $safe_name;
+                if ( move_uploaded_file( $file['tmp_name'], $dest ) ) {
+                    echo '<div class="updated"><p>' . esc_html__( 'Média importé.', 'tour-guide' ) . '</p></div>';
+                } else {
+                    echo '<div class="error"><p>' . esc_html__( 'Échec de l’import du média.', 'tour-guide' ) . '</p></div>';
+                }
+            } else {
+                echo '<div class="error"><p>' . esc_html__( 'Type de fichier non autorisé pour les médias.', 'tour-guide' ) . '</p></div>';
+            }
+        }
         if ( $_POST['tour_guide_action'] === 'save_template' ) {
             $result = tour_guide_handle_save_template_post();
             if ( $result['success'] ) {
@@ -344,6 +385,63 @@ function tour_guide_render_templates_page() {
                 <tbody>
                     <?php
                     $existing_steps = $editing_template ? $editing_template['steps'] : array();
+
+                    // Prépare la liste des médias disponibles dans:
+                    // - le dossier assets/media du plugin
+                    // - le dossier d’uploads /tour-guide/media
+                    $video_files = array();
+                    $image_files = array();
+
+                    // 1) Médias du plugin
+                    $plugin_media_dir = trailingslashit( TOUR_GUIDE_DIR ) . 'assets/media/';
+                    $plugin_media_url = trailingslashit( TOUR_GUIDE_URL ) . 'assets/media/';
+                    if ( is_dir( $plugin_media_dir ) ) {
+                        $plugin_media_paths = glob( $plugin_media_dir . '*.{mp4,webm,ogg,jpg,jpeg,png,gif,webp}', GLOB_BRACE );
+                        if ( $plugin_media_paths ) {
+                            foreach ( $plugin_media_paths as $mp ) {
+                                $basename = basename( $mp );
+                                $ext = strtolower( pathinfo( $basename, PATHINFO_EXTENSION ) );
+                                $full_url = $plugin_media_url . $basename;
+                                // On stocke une URL relative (sans nom de domaine)
+                                $rel_url = function_exists( 'wp_make_link_relative' ) ? wp_make_link_relative( $full_url ) : $full_url;
+                                $item = array(
+                                    'file' => $basename,
+                                    'url'  => $rel_url,
+                                );
+                                if ( in_array( $ext, array( 'mp4', 'webm', 'ogg' ), true ) ) {
+                                    $video_files[] = $item;
+                                } else {
+                                    $image_files[] = $item;
+                                }
+                            }
+                        }
+                    }
+
+                    // 2) Médias uploadés
+                    $upload_media_dir = tour_guide_get_media_dir();
+                    $upload_media_url = tour_guide_get_media_url();
+                    if ( is_dir( $upload_media_dir ) ) {
+                        $upload_media_paths = glob( trailingslashit( $upload_media_dir ) . '*.{mp4,webm,ogg,jpg,jpeg,png,gif,webp}', GLOB_BRACE );
+                        if ( $upload_media_paths ) {
+                            foreach ( $upload_media_paths as $mp ) {
+                                $basename = basename( $mp );
+                                $ext = strtolower( pathinfo( $basename, PATHINFO_EXTENSION ) );
+                                $full_url = $upload_media_url . $basename;
+                                // URL relative (sans nom de domaine)
+                                $rel_url = function_exists( 'wp_make_link_relative' ) ? wp_make_link_relative( $full_url ) : $full_url;
+                                $item = array(
+                                    'file' => $basename,
+                                    'url'  => $rel_url,
+                                );
+                                if ( in_array( $ext, array( 'mp4', 'webm', 'ogg' ), true ) ) {
+                                    $video_files[] = $item;
+                                } else {
+                                    $image_files[] = $item;
+                                }
+                            }
+                        }
+                    }
+
                     $rows_count = max( count( $existing_steps ), 1 );
                     for ( $i = 0; $i < $rows_count; $i++ ) {
                         $step = isset( $existing_steps[ $i ] ) ? $existing_steps[ $i ] : array( 'type' => 'step', 'include_template' => '', 'selector' => '', 'title' => '', 'description' => '', 'position' => '', 'action' => 'none', 'action_selector' => '', 'wait_for' => '', 'wait_timeout' => '', 'delay_ms' => '', 'navigate_to' => '', 'resume' => 'none' );
@@ -380,6 +478,35 @@ function tour_guide_render_templates_page() {
                             </td>
                             <td class="tg-sec-desc">
                                 <span class="tg-cell-label"><span class="tg-info" data-tip="Description affichée dans la popover">i</span></span>
+                                <?php if ( ! empty( $video_files ) || ! empty( $image_files ) ) : ?>
+                                    <div class="tg-media-tools">
+                                        <?php if ( ! empty( $video_files ) ) : ?>
+                                            <div class="tg-video-tools">
+                                                <label for="tg-video-select-<?php echo $i; ?>" class="screen-reader-text"><?php echo esc_html__( 'Insérer une vidéo', 'tour-guide' ); ?></label>
+                                                <select id="tg-video-select-<?php echo $i; ?>" class="tg-video-select" data-step-index="<?php echo $i; ?>">
+                                                    <option value=""><?php echo esc_html__( 'Sélectionner une vidéo à insérer…', 'tour-guide' ); ?></option>
+                                                    <?php foreach ( $video_files as $vf ) : ?>
+                                                        <option value="<?php echo esc_attr( $vf['url'] ); ?>"><?php echo esc_html( $vf['file'] ); ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <button type="button" class="button tg-video-copy-btn" data-step-index="<?php echo $i; ?>"><?php echo esc_html__( 'Copier le code vidéo', 'tour-guide' ); ?></button>
+                                            </div>
+                                        <?php endif; ?>
+
+                                        <?php if ( ! empty( $image_files ) ) : ?>
+                                            <div class="tg-image-tools" style="margin-top:4px;">
+                                                <label for="tg-image-select-<?php echo $i; ?>" class="screen-reader-text"><?php echo esc_html__( 'Insérer une image', 'tour-guide' ); ?></label>
+                                                <select id="tg-image-select-<?php echo $i; ?>" class="tg-image-select" data-step-index="<?php echo $i; ?>">
+                                                    <option value=""><?php echo esc_html__( 'Sélectionner une image à insérer…', 'tour-guide' ); ?></option>
+                                                    <?php foreach ( $image_files as $im ) : ?>
+                                                        <option value="<?php echo esc_attr( $im['url'] ); ?>"><?php echo esc_html( $im['file'] ); ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <button type="button" class="button tg-image-copy-btn" data-step-index="<?php echo $i; ?>"><?php echo esc_html__( 'Copier le code image', 'tour-guide' ); ?></button>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
                                 <textarea name="step_description[]" rows="2" class="large-text"><?php echo esc_textarea( $step['description'] ); ?></textarea>
                             </td>
                             <td class="tg-sec-position">
@@ -524,7 +651,7 @@ function tour_guide_render_templates_page() {
                                     <a href="<?php echo esc_url( admin_url( 'admin.php?page=tour-guide-templates&edit=' . urlencode( $tpl['id'] ) ) ); ?>" class="button button-small"><?php echo esc_html__( 'Modifier', 'tour-guide' ); ?></a>
                                     <button type="button" class="button button-small tour-guide-export-btn" data-id="<?php echo esc_attr( $tpl['id'] ); ?>" style="margin-left: 5px;"><?php echo esc_html__( 'Exporter', 'tour-guide' ); ?></button>
                                     <?php if($tpl['source']==='upload'): ?>
-                                    <button type="button" class="button button-small button-link-delete tour-guide-delete-btn" data-id="<?php echo esc_attr( $tpl['id'] ); ?>" style="color: #b32d2e; margin-left: 5px;"><?php echo esc_html__( 'Supprimer', 'tour-guide' ); ?></button>
+                                    <button type="button" class="button button-small button-link-delete tour-guide-delete-btn" data-id="<?php echo esc_attr( $tpl['id'] ); ?>" style="color: #b32d2e; margin-left: 5px;" aria-label="<?php echo esc_attr__( 'Supprimer ce template', 'tour-guide' ); ?>">&times;</button>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -617,6 +744,15 @@ function tour_guide_render_templates_page() {
             <input type="hidden" name="tour_guide_action" value="upload" />
             <input type="file" name="template_xml" accept=".xml" required />
             <button type="submit" class="button"><?php echo esc_html__( 'Importer', 'tour-guide' ); ?></button>
+        </form>
+
+        <h2 style="margin-top:20px;">&nbsp;</h2>
+        <h2><?php echo esc_html__( 'Importer un média (image / vidéo) pour les descriptions', 'tour-guide' ); ?></h2>
+        <form method="post" enctype="multipart/form-data">
+            <?php wp_nonce_field( 'tour_guide_templates' ); ?>
+            <input type="hidden" name="tour_guide_action" value="upload_media" />
+            <input type="file" name="tour_guide_media" accept="image/*,video/*" required />
+            <button type="submit" class="button"><?php echo esc_html__( 'Importer le média', 'tour-guide' ); ?></button>
         </form>
     </div>
     <?php
@@ -1106,10 +1242,13 @@ function tour_guide_parse_template_meta( $filepath, $source ) {
 		if ( preg_match( '/<template[^>]*id="([^"]+)"/i', $content, $m3 ) ) {
 			$attr_id = wp_strip_all_tags( $m3[1] );
 		}
-		// Extraction de l’attribut page_start éventuel
-		if ( preg_match( '/<template[^>]*page_start="([^"]+)"/i', $content, $m4 ) ) {
-			$page_start = wp_strip_all_tags( $m4[1] );
-		}
+			// Extraction de l’attribut page_start éventuel
+			if ( preg_match( '/<template[^>]*page_start="([^"]+)"/i', $content, $m4 ) ) {
+				// Décoder les entités XML/HTML pour retrouver une URL exploitable (ex: &amp; -> &)
+				$page_start_raw = $m4[1];
+				$page_start_decoded = html_entity_decode( $page_start_raw, ENT_QUOTES, 'UTF-8' );
+				$page_start = wp_strip_all_tags( $page_start_decoded );
+			}
         // Extraction de l’attribut type éventuel
 		if ( preg_match( '/<template[^>]*type="([^"]+)"/i', $content, $m5 ) ) {
 			$type = wp_strip_all_tags( $m5[1] );
